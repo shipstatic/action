@@ -25,7 +25,7 @@ jobs:
         run: npm ci && npm run build
 
       - name: Deploy
-        uses: shipstatic/ship-action@v1
+        uses: shipstatic/action@v1
         with:
           api-key: ${{ secrets.SHIP_API_KEY }}
           path: ./dist
