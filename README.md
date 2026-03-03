@@ -1,4 +1,4 @@
-# Shipstatic Deploy Action
+# Shipstatic
 
 Deploy static sites to [Shipstatic](https://shipstatic.com) from GitHub Actions.
 
