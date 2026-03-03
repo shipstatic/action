@@ -37,17 +37,17 @@ jobs:
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `api-key` | Yes | — | Shipstatic API key |
+| `api-key` | Yes | - | Shipstatic API key |
 | `path` | No | `.` | Directory to deploy |
-| `domain` | No | — | Domain to link to the deployment |
-| `github-token` | No | — | GitHub token for PR comments and deployment tracking |
+| `domain` | No | - | Domain to link to the deployment |
+| `github-token` | No | - | GitHub token for PR comments and deployment tracking |
 
 The `github-token` input enables two features:
 
-- **PR comments** — posts the deployment URL as a comment on pull requests
-- **GitHub Deployments** — creates deployment objects visible in the repo sidebar
+- **PR comments** - posts the deployment URL as a comment on pull requests
+- **GitHub Deployments** - creates deployment objects visible in the repo sidebar
 
-Use the automatic `${{ secrets.GITHUB_TOKEN }}` — no extra secrets needed. Your workflow needs these permissions:
+Use the automatic `${{ secrets.GITHUB_TOKEN }}` - no extra secrets needed. Your workflow needs these permissions:
 
 ```yaml
 permissions:
