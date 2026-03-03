@@ -11,6 +11,7 @@ on:
     branches: [main]
 
 permissions:
+  contents: read
   deployments: write
   pull-requests: write
 
@@ -50,6 +51,7 @@ Use the automatic `${{ secrets.GITHUB_TOKEN }}` — no extra secrets needed. You
 
 ```yaml
 permissions:
+  contents: read
   deployments: write
   pull-requests: write
 ```
