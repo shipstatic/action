@@ -1,13 +1,13 @@
-name: 'Shipstatic'
-description: 'Deploy a static site to Shipstatic and link it to your domain'
+name: 'ShipStatic'
+description: 'Deploy static sites to ShipStatic'
 branding:
   icon: 'upload-cloud'
   color: 'blue'
 
 inputs:
   api-key:
-    description: 'Shipstatic API key'
-    required: true
+    description: 'ShipStatic API key'
+    required: false
   path:
     description: 'Directory to deploy'
     required: false
@@ -26,11 +26,14 @@ outputs:
   url:
     description: 'Deployment URL'
     value: ${{ steps.deploy.outputs.url }}
+  claim:
+    description: 'Claim URL for public deployments (visit to keep permanently)'
+    value: ${{ steps.deploy.outputs.claim }}
 
 runs:
   using: 'composite'
   steps:
-    - name: Install Shipstatic CLI
+    - name: Install ShipStatic CLI
       shell: bash
       run: npm install -g @shipstatic/ship@latest
 
@@ -45,10 +48,11 @@ runs:
       run: |
         OUTPUT=$(ship "$DEPLOY_PATH" --label "${GIT_SHA:0:7}" --json --no-color)
         echo "id=$(echo "$OUTPUT" | jq -r 'select(.deployment) | .deployment')" >> "$GITHUB_OUTPUT"
-        echo "url=$(echo "$OUTPUT" | jq -r 'select(.url) | .url')" >> "$GITHUB_OUTPUT"
+        echo "url=$(echo "$OUTPUT" | jq -r 'select(.deployment) | "https://" + .deployment')" >> "$GITHUB_OUTPUT"
+        echo "claim=$(echo "$OUTPUT" | jq -r 'select(.deployment) | .claim // empty')" >> "$GITHUB_OUTPUT"
 
     - name: Link domain
-      if: ${{ inputs.domain != '' && steps.deploy.outputs.id != '' }}
+      if: ${{ inputs.api-key != '' && inputs.domain != '' && steps.deploy.outputs.id != '' }}
       shell: bash
       env:
         SHIP_API_KEY: ${{ inputs.api-key }}
@@ -84,7 +88,12 @@ runs:
         GH_REPO: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+        CLAIM_URL: ${{ steps.deploy.outputs.claim }}
       run: |
-        COMMENT="Deployed to $DEPLOY_URL"
+        if [[ -n "$CLAIM_URL" ]]; then
+          printf -v COMMENT 'Deployed to %s\n\nExpires in 3 days. [Get a free API key](https://my.shipstatic.com/api-key) for permanent deployments.' "$DEPLOY_URL"
+        else
+          COMMENT="Deployed to $DEPLOY_URL"
+        fi
         gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$COMMENT" --edit-last 2>/dev/null ||
         gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$COMMENT"
