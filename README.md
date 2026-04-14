@@ -91,10 +91,12 @@ permissions:
 
 ## Examples
 
-Two complete workflows in the [action-example](https://github.com/shipstatic/action-example) repo:
+Four copy-pasteable workflows in the [action-example](https://github.com/shipstatic/action-example) repo:
 
-- [`preview.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/preview.yml) — free preview deploys for pull requests
-- [`deploy.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy.yml) — permanent production deploys with custom domain
+- [`deploy-no-account.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy-no-account.yml) — deploy on push, no account needed
+- [`deploy-api-key.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy-api-key.yml) — permanent deploy with API key
+- [`deploy-domain.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy-domain.yml) — permanent deploy with custom domain
+- [`preview-pr.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/preview-pr.yml) — preview deploy on pull request
 
 ## License
 
