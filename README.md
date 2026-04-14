@@ -23,6 +23,8 @@ Your site is live instantly on `*.shipstatic.com`. No API key, no sign-up, no co
 
 Deployments without an API key are public and expire in 3 days. The `claim` output contains a URL to keep the site permanently.
 
+Add `github-token: ${{ secrets.GITHUB_TOKEN }}` to post the URL as a PR comment and track deployments in the repo sidebar.
+
 ## All Features — Free API Key
 
 For permanent deployments and full control over your sites and domains, get a free API key from [my.shipstatic.com/api-key](https://my.shipstatic.com/api-key):
@@ -87,9 +89,12 @@ permissions:
 | `url` | Deployment URL (e.g. `https://happy-cat-abc1234.shipstatic.com`) |
 | `claim` | Claim URL for public deployments (visit to keep permanently) |
 
-## Example
+## Examples
 
-See [action-example](https://github.com/shipstatic/action-example) for a complete working example with React + Vite, including production deploys with custom domains and PR preview comments.
+Two complete workflows in the [action-example](https://github.com/shipstatic/action-example) repo:
+
+- [`preview.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/preview.yml) — free preview deploys for pull requests
+- [`deploy.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy.yml) — permanent production deploys with custom domain
 
 ## License
 
