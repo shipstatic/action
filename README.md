@@ -92,12 +92,13 @@ permissions:
 
 ## Examples
 
-Four copy-pasteable workflows in the [action-example](https://github.com/shipstatic/action-example) repo:
+Five copy-pasteable workflows in the [action-example](https://github.com/shipstatic/action-example) repo:
 
 - [`deploy-no-account.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy-no-account.yml) — deploy on push, no account needed
 - [`deploy-api-key.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy-api-key.yml) — permanent deploy with API key
 - [`deploy-domain.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy-domain.yml) — permanent deploy with custom domain
 - [`preview-pr.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/preview-pr.yml) — preview deploy on pull request
+- [`deploy-password.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy-password.yml) — password-protected deploy (any tier)
 
 ## License
 
