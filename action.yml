@@ -1,5 +1,5 @@
 name: 'ShipStatic'
-description: 'Deploy static sites to ShipStatic'
+description: 'Deploy static websites, landing pages, and prototypes to ShipStatic from CI'
 branding:
   icon: 'upload-cloud'
   color: 'blue'
@@ -14,6 +14,9 @@ inputs:
     default: '.'
   domain:
     description: 'Domain to link to the deployment'
+    required: false
+  password:
+    description: 'Password-protect the deployment (6–128 characters; whitespace significant). Visitors are prompted to unlock before viewing.'
     required: false
   github-token:
     description: 'GitHub token for PR comments and deployment tracking'
@@ -42,10 +45,12 @@ runs:
       shell: bash
       env:
         SHIP_API_KEY: ${{ inputs.api-key }}
+        SHIP_PASSWORD: ${{ inputs.password }}
         SHIP_VIA: git
         DEPLOY_PATH: ${{ inputs.path }}
         GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
+        [[ -z "$SHIP_PASSWORD" ]] && unset SHIP_PASSWORD
         OUTPUT=$(ship "$DEPLOY_PATH" --label "${GIT_SHA:0:7}" --json --no-color)
         echo "id=$(echo "$OUTPUT" | jq -r 'select(.deployment) | .deployment')" >> "$GITHUB_OUTPUT"
         echo "url=$(echo "$OUTPUT" | jq -r 'select(.deployment) | "https://" + .deployment')" >> "$GITHUB_OUTPUT"

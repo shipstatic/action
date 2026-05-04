@@ -65,6 +65,7 @@ jobs:
 | `api-key` | No | — | ShipStatic API key for permanent deployments |
 | `path` | No | `.` | Directory to deploy |
 | `domain` | No | — | Domain to link (requires `api-key`) |
+| `password` | No | — | Password-protect the deployment (6–128 characters; whitespace significant). Visitors are prompted to unlock before viewing |
 | `github-token` | No | — | GitHub token for PR comments and deployment tracking |
 
 The `github-token` input enables two features:
