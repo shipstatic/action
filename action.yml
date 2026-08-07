@@ -5,65 +5,129 @@ branding:
   color: 'blue'
 
 inputs:
-  api-key:
-    description: 'ShipStatic API key'
+  token:
+    description: 'ShipStatic token — an API key (ship-…) or a deploy token (deploy-…). Omit to deploy anonymously: the site is public, expires, and can be claimed.'
+    required: false
+  api-url:
+    description: 'ShipStatic API endpoint. Defaults to the production API.'
     required: false
   path:
     description: 'Directory to deploy'
     required: false
     default: '.'
   domain:
-    description: 'Domain to link to the deployment'
+    description: 'Domain to link to the deployment (requires token)'
     required: false
   password:
     description: 'Password-protect the deployment (6–128 characters; whitespace significant). Visitors are prompted to unlock before viewing.'
+    required: false
+  labels:
+    description: 'Comma-separated labels for the deployment. The commit short SHA is always applied; these are added to it.'
+    required: false
+  idempotency-key:
+    description: 'Override the derived idempotency key. Defaults to this workflow run + job, so re-running a job replays the original deployment instead of deploying twice. Set one per matrix leg when legs deploy different content.'
     required: false
   github-token:
     description: 'GitHub token for PR comments and deployment tracking'
     required: false
 
 outputs:
-  id:
-    description: 'Deployment ID'
-    value: ${{ steps.deploy.outputs.id }}
+  deployment:
+    description: 'Deployment hostname (e.g. happy-cat-abc1234.shipstatic.com)'
+    value: ${{ steps.deploy.outputs.deployment }}
   url:
     description: 'Deployment URL'
     value: ${{ steps.deploy.outputs.url }}
   claim:
-    description: 'Claim URL for public deployments (visit to keep permanently)'
+    description: 'Claim URL — set for anonymous deployments only (visit to keep permanently)'
     value: ${{ steps.deploy.outputs.claim }}
+  expires:
+    description: 'Expiry as a unix timestamp in seconds — set for anonymous deployments only'
+    value: ${{ steps.deploy.outputs.expires }}
 
 runs:
   using: 'composite'
   steps:
+    # MAJORS PIN MAJORS. An action whose interface is a contract with a CLI must
+    # name the CLI major it speaks: `@v2` speaks 2.x, forever. `@latest` here
+    # would put whatever the registry serves this minute inside every consumer's
+    # workflow — and the 2.x CLI does not read the 1.x credential variable, so a
+    # float across that boundary turns an authenticated deploy into a silent
+    # anonymous one. During the 2.x beta window this pins the EXACT beta,
+    # because npm ranges never match prereleases; the commit that tags `v2.0.0`
+    # flips it to `@2`. `.github/workflows/ci.yml` fences both forms.
     - name: Install ShipStatic CLI
       shell: bash
-      run: npm install -g @shipstatic/ship@latest
+      run: npm install -g @shipstatic/ship@2.0.0-beta.19
 
     - name: Deploy
       id: deploy
       shell: bash
       env:
-        SHIP_API_KEY: ${{ inputs.api-key }}
+        SHIP_TOKEN: ${{ inputs.token }}
+        SHIP_API_URL: ${{ inputs.api-url }}
         SHIP_PASSWORD: ${{ inputs.password }}
         SHIP_VIA: git
         DEPLOY_PATH: ${{ inputs.path }}
+        LABELS: ${{ inputs.labels }}
+        IDEMPOTENCY_KEY: ${{ inputs.idempotency-key }}
         GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
-        [[ -z "$SHIP_PASSWORD" ]] && unset SHIP_PASSWORD
-        OUTPUT=$(ship "$DEPLOY_PATH" --label "${GIT_SHA:0:7}" --json --no-color)
-        echo "id=$(echo "$OUTPUT" | jq -r 'select(.deployment) | .deployment')" >> "$GITHUB_OUTPUT"
-        echo "url=$(echo "$OUTPUT" | jq -r 'select(.deployment) | "https://" + .deployment')" >> "$GITHUB_OUTPUT"
-        echo "claim=$(echo "$OUTPUT" | jq -r 'select(.deployment) | .claim // empty')" >> "$GITHUB_OUTPUT"
+        # The CLI normalizes an empty value to absence itself; this is defense
+        # in depth for whatever CLI the pin above resolves.
+        if [ -z "$SHIP_PASSWORD" ]; then unset SHIP_PASSWORD; fi
+
+        # Key the ATTEMPT, never the try. GITHUB_RUN_ID is stable across
+        # re-runs and fresh per push, so pressing "re-run jobs" replays the
+        # original 201 instead of deploying twice; the job is part of the key
+        # because two jobs in one run may deploy two different sites, and the
+        # repository is part of it because GitHub only guarantees a run id
+        # unique WITHIN a repository — anonymous deploys share a replay
+        # namespace keyed by the runner's egress IP, which every repository on
+        # a hosted runner shares.
+        if [ -z "$IDEMPOTENCY_KEY" ]; then
+          IDEMPOTENCY_KEY="${GITHUB_REPOSITORY}-${GITHUB_RUN_ID}-${GITHUB_JOB}"
+        fi
+        export SHIP_IDEMPOTENCY_KEY="$IDEMPOTENCY_KEY"
+
+        # The commit short SHA is ambient attempt metadata, applied like
+        # SHIP_VIA and the key above: read from the context, never asked for.
+        # The user's labels are appended; the CLI validates each one and its
+        # message relays, so there is no second validator here.
+        ARGS=(--label "${GIT_SHA:0:7}")
+        if [ -n "$LABELS" ]; then
+          IFS=',' read -ra PARTS <<< "$LABELS"
+          for part in "${PARTS[@]}"; do
+            # `read` strips surrounding whitespace, so `a, b` and `a,b` agree.
+            # Only the edges — a label with inner whitespace is invalid and must
+            # reach the CLI to be refused by name, not be silently repaired.
+            read -r part <<< "$part"
+            if [ -n "$part" ]; then ARGS+=(--label "$part"); fi
+          done
+        fi
+
+        OUTPUT=$(ship "$DEPLOY_PATH" "${ARGS[@]}" --json --no-color)
+
+        # Every value is read off the wire. `url` in particular is NOT
+        # reassembled from the hostname: the response owns its own URL, and a
+        # client that rebuilds one is a client that disagrees with the platform
+        # the day the shape changes.
+        {
+          echo "deployment=$(jq -r '.deployment // empty' <<< "$OUTPUT")"
+          echo "url=$(jq -r '.url // empty' <<< "$OUTPUT")"
+          echo "claim=$(jq -r '.claim // empty' <<< "$OUTPUT")"
+          echo "expires=$(jq -r '.expires // empty' <<< "$OUTPUT")"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Link domain
-      if: ${{ inputs.api-key != '' && inputs.domain != '' && steps.deploy.outputs.id != '' }}
+      if: ${{ inputs.token != '' && inputs.domain != '' && steps.deploy.outputs.deployment != '' }}
       shell: bash
       env:
-        SHIP_API_KEY: ${{ inputs.api-key }}
+        SHIP_TOKEN: ${{ inputs.token }}
+        SHIP_API_URL: ${{ inputs.api-url }}
         DOMAIN: ${{ inputs.domain }}
-        DEPLOYMENT_ID: ${{ steps.deploy.outputs.id }}
-      run: ship domains set "$DOMAIN" "$DEPLOYMENT_ID" --json --no-color
+        DEPLOYMENT: ${{ steps.deploy.outputs.deployment }}
+      run: ship domains set "$DOMAIN" "$DEPLOYMENT" --json --no-color
 
     - name: Create GitHub deployment
       if: ${{ inputs.github-token != '' && steps.deploy.outputs.url != '' }}
@@ -94,11 +158,41 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         DEPLOY_URL: ${{ steps.deploy.outputs.url }}
         CLAIM_URL: ${{ steps.deploy.outputs.claim }}
+        EXPIRES: ${{ steps.deploy.outputs.expires }}
       run: |
-        if [[ -n "$CLAIM_URL" ]]; then
-          printf -v COMMENT 'Deployed to %s\n\nExpires in 3 days. [Get a free API key](https://my.shipstatic.com/api-key) for permanent deployments.' "$DEPLOY_URL"
-        else
-          COMMENT="Deployed to $DEPLOY_URL"
+        # One comment per PR, updated in place on every push. The marker is what
+        # makes that safe: `gh pr comment --edit-last` edits the authenticated
+        # identity's last comment WHATEVER wrote it, so on a PR where another
+        # workflow also comments as github-actions[bot] the two clobber each
+        # other. Finding our own comment by marker cannot.
+        MARKER='<!-- shipstatic/action -->'
+
+        # The expiry is the wire's `expires`, rendered as a real date. A
+        # hand-written "expires in 3 days" is stale the moment it is read, and
+        # this file has no compiler and no test runner to hold a copy honest —
+        # the only duration it can state truthfully forever is one it read off
+        # the response.
+        NOTE=""
+        if [ -n "$EXPIRES" ]; then
+          WHEN=$(date -u -d "@$EXPIRES" '+%-d %B %Y, %H:%M UTC' 2>/dev/null \
+              || date -u -r "$EXPIRES" '+%-d %B %Y, %H:%M UTC')
+          NOTE="Expires $WHEN — [claim this deployment]($CLAIM_URL) to keep it."
         fi
-        gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$COMMENT" --edit-last 2>/dev/null ||
-        gh pr comment "$PR_NUMBER" --repo "$GH_REPO" --body "$COMMENT"
+
+        if [ -n "$NOTE" ]; then
+          BODY=$(printf '%s\nDeployed to %s\n\n%s' "$MARKER" "$DEPLOY_URL" "$NOTE")
+        else
+          BODY=$(printf '%s\nDeployed to %s' "$MARKER" "$DEPLOY_URL")
+        fi
+
+        # Collected into a variable rather than piped into `head`: closing the
+        # pipe early would SIGPIPE `gh` and, under `pipefail`, fail the step.
+        FOUND=$(gh api --paginate "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
+          --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id")
+        ID=$(printf '%s\n' "$FOUND" | head -1)
+
+        if [ -n "$ID" ]; then
+          gh api --silent -X PATCH "repos/$GH_REPO/issues/comments/$ID" -f body="$BODY"
+        else
+          gh api --silent "repos/$GH_REPO/issues/$PR_NUMBER/comments" -f body="$BODY"
+        fi

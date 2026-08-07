@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>shipstatic/action — CI fixture</title>
+  </head>
+  <body>
+    <!--
+      The site `.github/workflows/ci.yml` deploys on every run. One file, no
+      build: the fence is testing the action, not a bundler. It is a real page
+      because the anonymous leg fetches the deployed URL and requires a 200 —
+      an empty directory would prove the API accepted a request, not that the
+      platform served a site.
+    -->
+    <h1>shipstatic/action</h1>
+    <p>Deployed by this repository's CI to verify the action end to end.</p>
+  </body>
+</html>

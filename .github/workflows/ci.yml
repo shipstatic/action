@@ -1,0 +1,256 @@
+# The Action's fence is the Action, run for real.
+#
+# This repo has no build, no manifest and no unit tests — the product is
+# `action.yml`, and the only honest way to check it is to USE it. Until this
+# file existed, a broken `action.yml` was caught by www's PRODUCTION deploy,
+# which is the worst possible fence.
+#
+# Tests-only on both branches: releases here are the major TAG moves, never a
+# branch push. Nothing in this file publishes anything.
+#
+# The e2e jobs perform REAL deployments to the dev environment on every run,
+# which is why they declare `environment: development` rather than reading a
+# repo variable: the deployment records GitHub writes are then true, the dev
+# credential is scoped to the jobs that deploy instead of to every workflow,
+# and the environment is the home the root CLAUDE.md "Branch & CI Model" names
+# for per-environment values. This repo is that mechanism's first consumer.
+name: CI
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main, development]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      # actionlint reads `.github/workflows/**` and shellchecks the `run:`
+      # blocks it finds there. It does NOT read `action.yml` — so it fences
+      # THIS file, not the product. The product's fences are the two checks
+      # below plus the e2e jobs. Pinned exactly: this is the only third-party
+      # code in the repo.
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color
+
+      # MAJORS PIN MAJORS, mechanically. The fence for the one failure this
+      # whole design exists to prevent: a floating install line hands every
+      # consumer whatever the registry serves that minute, and across the
+      # 1.x → 2.x boundary that silently turns an authenticated deploy into an
+      # anonymous one — a 201 into the public account, claim URL and all.
+      #
+      # Both pin forms pass: an exact beta during the 2.x beta window (npm
+      # ranges never match prereleases, so `2` resolves nothing until 2.0.0
+      # stable exists) and the `2` range from the v2.0.0 tag on. The check is
+      # on the MAJOR, which is exactly what this action's own major promises.
+      # `|| true` on both greps is load-bearing, not defensive noise: a run
+      # block is `bash -e`, so the NO-MATCH case — which is precisely the
+      # failure being fenced — would abort the step before its own error could
+      # print, and a fence that fails opaquely teaches nothing.
+      - name: The install line names a ship major
+        run: |
+          PIN=$(grep -oE '@shipstatic/ship@[0-9][0-9A-Za-z.-]*' action.yml | head -1 | cut -d@ -f3 || true)
+          if [ -z "$PIN" ]; then
+            echo "::error file=action.yml::the install line does not pin a ship version. v2 speaks ship 2.x; a floating install is the failure this action's versioning exists to prevent"
+            exit 1
+          fi
+          if [ "${PIN%%.*}" != "2" ]; then
+            echo "::error file=action.yml::this is the v2 action but it installs ship $PIN — majors pin majors"
+            exit 1
+          fi
+          echo "action.yml pins ship $PIN"
+
+      # The five-step shape, held mechanically. Five shell steps is the
+      # product's whole surface, and a sixth is a design change rather than an
+      # edit — this makes someone say so out loud. It also stands in for the
+      # static check this repo does not have: shellcheck reads shell, not YAML,
+      # and a bespoke extractor that silently found zero blocks would be a
+      # green fence proving nothing. Deciding to add a step means updating this
+      # number, which is the moment to reread the shell.
+      - name: The action is five shell steps
+        run: |
+          STEPS=$(grep -c '^      shell: bash$' action.yml || true)
+          if [ "$STEPS" != "5" ]; then
+            echo "::error file=action.yml::expected 5 shell steps, found $STEPS — the five-step shape is part of the contract; update this fence deliberately"
+            exit 1
+          fi
+
+  # Anonymous is a first-class path, not a fallback: it is what the README's
+  # two-line quickstart does and what `deploy-no-account.yml` demonstrates.
+  # These deploys land in the dev PUBLIC account, whose deployment cap is
+  # raised for exactly this kind of repeated smoke.
+  #
+  # Skipped on FORK pull requests, and the job-level `if:` is the only place
+  # that can do it: GitHub withholds environment secrets AND variables from a
+  # fork, so an empty SHIP_API_URL there is the platform working as designed
+  # rather than a misconfigured repo — and the guard step below cannot tell the
+  # two apart. A red e2e on a community PR would be a lie; a skipped job says
+  # what happened. This is a public repo, so a maintainer re-runs the change
+  # from a branch to verify it.
+  e2e-anonymous:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: development
+    steps:
+      - uses: actions/checkout@v7
+
+      # An unset SHIP_API_URL makes the CLI fall back to its own default, which
+      # is PRODUCTION — so a repo whose development environment is not
+      # configured would silently deploy junk into the live public account on
+      # every push. Refuse instead of falling back.
+      - name: The dev environment is configured
+        env:
+          API_URL: ${{ vars.SHIP_API_URL }}
+        run: |
+          if [ -z "$API_URL" ]; then
+            echo "::error::the development GitHub Environment has no SHIP_API_URL variable. Without it this job would deploy to production"
+            exit 1
+          fi
+
+      - uses: ./
+        id: deploy
+        with:
+          api-url: ${{ vars.SHIP_API_URL }}
+          path: fixture
+
+      # The outputs are the action's published contract. The URL serving 200 is
+      # what proves the deploy was real rather than merely acknowledged.
+      - name: The outputs are populated and the site serves
+        env:
+          DEPLOYMENT: ${{ steps.deploy.outputs.deployment }}
+          URL: ${{ steps.deploy.outputs.url }}
+          CLAIM: ${{ steps.deploy.outputs.claim }}
+          EXPIRES: ${{ steps.deploy.outputs.expires }}
+        run: |
+          test -n "$DEPLOYMENT" || { echo "::error::deployment output is empty"; exit 1; }
+          test -n "$URL"        || { echo "::error::url output is empty"; exit 1; }
+
+          # An anonymous deployment is claimable AND expiring — one constant
+          # sets both, so a live site with a dead claim link is a coherence bug.
+          case "$CLAIM" in
+            http*) ;;
+            *) echo "::error::claim is not a URL: '$CLAIM'"; exit 1 ;;
+          esac
+          case "$EXPIRES" in
+            '' | *[!0-9]*) echo "::error::expires is not unix seconds: '$EXPIRES'"; exit 1 ;;
+          esac
+
+          # `url` must be the wire's own, never reassembled from the hostname.
+          if [ "$URL" != "https://$DEPLOYMENT" ]; then
+            echo "::error::url ($URL) does not address deployment ($DEPLOYMENT)"
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 2 \
+            --retry-all-errors --output /dev/null "$URL"
+          echo "$URL serves"
+
+  # The authenticated half — and the leg that proves the credential input
+  # reaches a variable the CLI actually reads.
+  #
+  # It skips loudly rather than failing when the dev token is absent, so a fork
+  # is green and a misconfigured environment is never mistaken for a passing
+  # authed leg. The guard reads JOB-level `env`: a step's `if:` cannot see
+  # `env` declared on that same step, which is how the vscode repo's release
+  # workflow published nothing, silently, and looked green for months.
+  e2e-authenticated:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: development
+    env:
+      SHIP_TOKEN: ${{ secrets.SHIP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - if: env.SHIP_TOKEN == ''
+        run: echo "::notice::no SHIP_TOKEN in the development environment — the authenticated leg is unverified"
+
+      - name: The dev environment is configured
+        if: env.SHIP_TOKEN != ''
+        env:
+          API_URL: ${{ vars.SHIP_API_URL }}
+        run: |
+          if [ -z "$API_URL" ]; then
+            echo "::error::the development GitHub Environment has no SHIP_API_URL variable. Without it this job would deploy to production"
+            exit 1
+          fi
+
+      - uses: ./
+        id: deploy
+        if: env.SHIP_TOKEN != ''
+        with:
+          token: ${{ secrets.SHIP_TOKEN }}
+          api-url: ${{ vars.SHIP_API_URL }}
+          path: fixture
+          labels: ci-fence
+
+      # "The deploy succeeded" proves NOTHING on its own here: ship is
+      # fail-closed anonymous, so a credential the CLI does not read produces a
+      # perfectly successful PUBLIC deploy. The proof is the inverse of the
+      # anonymous leg — an owned deployment carries neither claim nor expiry.
+      - name: The deployment is owned, labelled, and attributed to git
+        if: env.SHIP_TOKEN != ''
+        env:
+          SHIP_API_URL: ${{ vars.SHIP_API_URL }}
+          DEPLOYMENT: ${{ steps.deploy.outputs.deployment }}
+          CLAIM: ${{ steps.deploy.outputs.claim }}
+          EXPIRES: ${{ steps.deploy.outputs.expires }}
+          # The sha the action labels with — the PR HEAD, not the merge commit
+          # the checkout leaves at git HEAD. Reading it from git here would
+          # reintroduce exactly the bug v1.0.3 fixed.
+          GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -n "$CLAIM" ] || [ -n "$EXPIRES" ]; then
+            echo "::error::an authenticated deploy came back claimable/expiring — the token was not read (claim='$CLAIM' expires='$EXPIRES')"
+            exit 1
+          fi
+
+          # Read the row back: `via` and the labels are stored server-side, so
+          # only a fetch proves the action sent what it claims to send.
+          ROW=$(ship deployments get "$DEPLOYMENT" --json --no-color)
+          echo "$ROW"
+
+          # Named, because a bare `test` that fails under `bash -e` reports
+          # only "exit code 1" and a fence must say what it caught.
+          expect() {
+            if [ "$2" != "$3" ]; then
+              echo "::error::$1 — expected '$3', got '$2'"
+              exit 1
+            fi
+          }
+          SHORT_SHA="${GIT_SHA:0:7}"
+          expect "via was not stored as git"      "$(jq -r '.via' <<< "$ROW")" "git"
+          expect "an owned deployment expires"    "$(jq -r '.expires' <<< "$ROW")" "null"
+          expect "wrong label count"              "$(jq -r '.labels | length' <<< "$ROW")" "2"
+          expect "the user label is missing"      "$(jq -r '.labels | index("ci-fence") != null' <<< "$ROW")" "true"
+          expect "the automatic sha label is missing" \
+            "$(jq -r --arg s "$SHORT_SHA" '.labels | index($s) != null' <<< "$ROW")" "true"
+          echo "owned, via=git, labelled $SHORT_SHA + ci-fence"
+
+  # The family CI shape: failures notify Slack where the webhook secret is
+  # set. One terminal job rather than a step in each — three jobs would mean
+  # three copies of the same guard. Job-level `env` so the `if:` can read it.
+  notify:
+    needs: [lint, e2e-anonymous, e2e-authenticated]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - if: env.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v4
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "🔴 action CI failed on ${{ github.ref_name }}"

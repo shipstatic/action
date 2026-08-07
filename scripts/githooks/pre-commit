@@ -1,0 +1,27 @@
+#!/bin/sh
+# Platform-standard pre-commit — the CREDENTIAL-SCAN HALF ONLY.
+#
+# Deviation from the byte-identical platform hook, and a recorded one: the
+# other two gates have nothing to run against here. There is no manifest, so
+# no pnpm and no biome (which parses nothing in this repo — YAML, Markdown and
+# shell are all outside it), and no `typecheck` script to find. The e2e fence
+# in `.github/workflows/ci.yml` is this repo's suite.
+#
+# There is also no `prepare` script to install this, for the same reason. Run
+# once per clone:
+#
+#   git config core.hooksPath scripts/githooks
+#
+# No ship-/deploy- credential may enter history. Test and example paths are
+# excluded — fixtures hold fake keys by design — as is the repeating fake
+# test key.
+LEAKS=$(git diff --cached --no-color --unified=0 --diff-filter=ACMR -- . \
+  ':(exclude)**/tests/**' ':(exclude)**/__tests__/**' ':(exclude)**/*.test.*' \
+  ':(exclude)test-utils/**' ':(exclude)examples/**' ':(exclude)e2e/**' \
+  | grep -E '^\+' | grep -E '(ship|deploy)-[0-9a-f]{64}' \
+  | grep -v '1234567890abcdef' || true)
+if [ -n "$LEAKS" ]; then
+  echo "credential detected in staged changes:" >&2
+  echo "$LEAKS" >&2
+  exit 1
+fi
