@@ -81,6 +81,14 @@ it is a one-line commit on `main`, from v1's own content. (`main` also holds
 two untagged README commits past `v1.2.0`; `v1.2.1` carries them, which is
 correct — they are documentation of the behaviour v1 already has.)
 
+The clock on this release has a demonstrated hazard behind it, not a
+hypothesis: ship `2.0.0-beta.16` sat on the registry with a broken artifact
+for a window of minutes (2026-08) — a floating install line's exposure is a
+proven class. And the pin freezes a cost that is accepted rather than
+overlooked: keyless `@v1` consumers stay broken against the 2.x API until
+they move to v2 — the platform's recorded pre-launch posture, chosen over
+teaching v1 the 2.x wire.
+
 ```bash
 git switch main
 # action.yml: @shipstatic/ship@latest → @shipstatic/ship@1
@@ -136,6 +144,13 @@ rule and its message relays, so the prose can only ever be documentation of a
 boundary someone else enforces). Bash and Markdown cannot import, and the
 Constellation Law's stopping rule tolerates a forced restatement in prose
 that teaches a value.
+
+A third restatement is decided the same way but fenced differently: the yaml
+necessarily copies the env-var names (`SHIP_API_URL`, `SHIP_TOKEN`) whose
+vocabulary `SHIP_ENV` in `@shipstatic/types` owns. A yaml surface cannot
+import, and the drift is LOUD — a wrong name makes the authed e2e leg deploy
+anonymously and fail its inverse assertion — so per the stopping rule the
+copies are held by the CI fence, not a copy-comparison.
 
 ### `api-url` has no default in `action.yml`, deliberately
 
