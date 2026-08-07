@@ -189,7 +189,7 @@ it*, so on a PR where any other workflow also comments as
 | Job | What it holds |
 |---|---|
 | `lint` | actionlint over `.github/workflows/**`; the install line names ship major 2; the action is five shell steps |
-| `e2e-anonymous` | Deploys `fixture/` keyless to dev; asserts all four outputs, that `url` addresses `deployment`, that claim + expires are both present, and that the URL serves 200 |
+| `e2e-anonymous` | Deploys `fixture/` keyless to dev; asserts all four outputs, that `url` addresses `deployment`, that claim + expires are both present, that the URL serves 200 — and that a SECOND same-job invocation REPLAYS the first deployment rather than creating one (the derived key's documented same-job collapse, used as the fence for the silent class: an unread `SHIP_IDEMPOTENCY_KEY` would keep succeeding and simply duplicate) |
 | `e2e-authenticated` | Same, with a token; asserts the deployment is **not** claimable or expiring, and reads `via` and both labels back from the API |
 
 Three things about it are deliberate:
