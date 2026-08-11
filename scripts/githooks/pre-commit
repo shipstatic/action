@@ -1,21 +1,13 @@
 #!/bin/sh
-# Platform-standard pre-commit — the CREDENTIAL-SCAN HALF ONLY.
-#
-# Deviation from the byte-identical platform hook, and a recorded one: the
-# other two gates have nothing to run against here. There is no manifest, so
-# no pnpm and no biome (which parses nothing in this repo — YAML, Markdown and
-# shell are all outside it), and no `typecheck` script to find. The e2e fence
-# in `.github/workflows/ci.yml` is this repo's suite.
-#
-# There is also no `prepare` script to install this, for the same reason. Run
-# once per clone:
-#
-#   git config core.hooksPath scripts/githooks
-#
-# No platform credential may enter history. Every minted population is scanned:
-# `ship-` keys, `deploy-` tokens, `claim-` codes — 32 hex each. A prefix is
-# what makes a secret recognisable away from the route that consumes it, which
-# is why all three carry one and why all three are matchable here.
+# Platform-standard pre-commit (byte-identical across ShipStatic repos).
+# Fast gate only — the full suite lives in CI.
+
+# No platform credential may enter history. Every prefixed population is
+# scanned: `ship-` keys, `deploy-` tokens — 32 hex each. A prefix is what
+# makes a secret recognisable away from the route that consumes it, which is
+# why both carry one and why both are matchable here. (The claim code is bare
+# hex by design and cannot be named by shape; it is single-use and TTL-bound,
+# which is what pays for that.)
 #
 # The match is unanchored, so a longer hex run trips it too.
 #
@@ -24,10 +16,17 @@
 LEAKS=$(git diff --cached --no-color --unified=0 --diff-filter=ACMR -- . \
   ':(exclude)**/tests/**' ':(exclude)**/__tests__/**' ':(exclude)**/*.test.*' \
   ':(exclude)test-utils/**' ':(exclude)examples/**' ':(exclude)e2e/**' \
-  | grep -E '^\+' | grep -E '(ship|deploy|claim)-[0-9a-f]{32}' \
+  | grep -E '^\+' | grep -E '(ship|deploy)-[0-9a-f]{32}' \
   | grep -v '1234567890abcdef' || true)
 if [ -n "$LEAKS" ]; then
   echo "credential detected in staged changes:" >&2
   echo "$LEAKS" >&2
   exit 1
+fi
+
+pnpm exec biome check --staged --no-errors-on-unmatched || exit 1
+
+# Typecheck when the repo defines it — cheap; CI runs the superset.
+if node -e "process.exit(require('./package.json').scripts?.typecheck ? 0 : 1)" 2>/dev/null; then
+  pnpm typecheck
 fi
