@@ -208,6 +208,63 @@ jobs:
             exit 1
           fi
 
+      # Prune BEFORE deploying, never after. This leg adds one owned row per
+      # push; owned deployments never expire, and the plan cap counts every
+      # row whatever its status, so without a prune the fence goes red on a
+      # schedule rather than on a defect.
+      #
+      # Deleting THIS run's row at the end instead would break the very
+      # property the derived idempotency key exists to provide: a re-run
+      # carries the same `<repo>-<run id>-<job>` key, so the API replays the
+      # original 201 — which would then name a row the previous attempt had
+      # deleted, and the read-back below would 404. Pruning at the start only
+      # ever touches EARLIER runs' rows, whose keys are already stale.
+      #
+      # This is the repo's one destructive CI step, and it is deliberately
+      # placed after the guard above: with no SHIP_API_URL the CLI falls back
+      # to production, and this step would prune PRODUCTION rows. The guard
+      # exits first, so it cannot.
+      #
+      # `ci-fence` is the label this leg already deploys with, so the selector
+      # is a derivation rather than new vocabulary — and it is load-bearing,
+      # not merely convenient: the CI account is the estate's shared dev e2e
+      # identity, so only rows this fence made may be reaped. The one-hour
+      # floor keeps a concurrent run from reaping a sibling's row
+      # mid-verification (the job's own budget is 10 minutes). One page is the
+      # whole account: the cap (25) sits below the API's default page size
+      # (50), so no cursor walk is needed.
+      - name: Prune earlier fence deployments
+        if: env.SHIP_TOKEN != ''
+        env:
+          SHIP_API_URL: ${{ vars.SHIP_API_URL }}
+        run: |
+          # Best-effort throughout: a prune that cannot run must never redden a
+          # run that otherwise proves the action works. A real outage still
+          # fails loudly one step below, on the deploy — which is the honest
+          # place for it. `run:` is `bash -eo pipefail`, so both the listing
+          # and each delete are asked for by name rather than left to abort
+          # the step from inside a pipeline.
+          if ! LISTING=$(ship deployments list --json --no-color); then
+            echo "::warning::could not list deployments to prune"
+            exit 0
+          fi
+
+          CUTOFF=$(( $(date -u +%s) - 3600 ))
+          STALE=$(jq -r --argjson cutoff "$CUTOFF" \
+            '.deployments[]
+               | select(.labels | index("ci-fence"))
+               | select(.created < $cutoff)
+               | .deployment' <<< "$LISTING")
+
+          while IFS= read -r ROW; do
+            [ -n "$ROW" ] || continue
+            if ship deployments delete "$ROW" --json --no-color > /dev/null; then
+              echo "pruned $ROW"
+            else
+              echo "::warning::could not prune $ROW"
+            fi
+          done <<< "$STALE"
+
       - uses: ./
         id: deploy
         if: env.SHIP_TOKEN != ''

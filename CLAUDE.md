@@ -205,14 +205,31 @@ it*, so on a PR where any other workflow also comments as
 |---|---|
 | `lint` | actionlint over `.github/workflows/**`; the install line names ship major 2; the action is five shell steps |
 | `e2e-anonymous` | Deploys `fixture/` keyless to dev; asserts all four outputs, that `url` addresses `deployment`, that claim + expires are both present, that the URL serves 200 — and that a SECOND same-job invocation REPLAYS the first deployment rather than creating one (the derived key's documented same-job collapse, used as the fence for the silent class: an unread `SHIP_IDEMPOTENCY_KEY` would keep succeeding and simply duplicate) |
-| `e2e-authenticated` | Same, with a token; asserts the deployment is **not** claimable or expiring, and reads `via` and both labels back from the API |
+| `e2e-authenticated` | Prunes earlier fence rows, then deploys with a token; asserts the deployment is **not** claimable or expiring, and reads `via` and both labels back from the API |
 
-Three things about it are deliberate:
+Four things about it are deliberate:
 
 - **The authed leg's assertion is the INVERSE of the anonymous one.** "The
   deploy succeeded" proves nothing here: fail-closed anonymity means a
   credential the CLI does not read still produces a clean 201. Only *no claim,
   no expiry* proves the token was read.
+- **The authed leg prunes at the START, never at the end.** It adds one owned
+  row per push, owned deployments never expire, and the plan cap counts every
+  row whatever its status — so the leg cleans up after itself or goes red on a
+  schedule rather than on a defect. Deleting its *own* row at the end would
+  break the property the derived idempotency key exists to provide: a re-run
+  carries the same key, so the API replays the original 201, which would then
+  name a row the previous attempt had deleted, and the read-back would 404.
+  Pruning at the start only ever touches earlier runs' rows, whose keys are
+  already stale. The selector is the `ci-fence` label the leg already deploys
+  with — load-bearing rather than convenient, since the CI account is the
+  estate's shared dev e2e identity and only rows this fence made may be
+  reaped — floored at one hour so a concurrent run cannot reap a sibling's row
+  mid-verification. It is the repo's one destructive CI step, which is why it
+  sits *after* the environment guard: with no `SHIP_API_URL` it would prune
+  production. Every part of it is best-effort, because a prune that cannot run
+  must not redden a run that otherwise proves the action works — a real outage
+  fails loudly one step later, on the deploy.
 - **The jobs refuse an unconfigured environment.** With no `SHIP_API_URL` the
   CLI would fall back to production, and `development` CI would deploy junk
   into the live public account on every push.
@@ -232,11 +249,22 @@ says what happened, and a maintainer re-runs the change from a branch.
 
 **USER setup, once:** a `development` GitHub Environment on
 `shipstatic/action` carrying a `SHIP_API_URL` variable (the dev API) and,
-optionally, a `SHIP_TOKEN` secret (a dev token). Without the secret the authed
-leg skips with a `::notice`; without the variable both e2e jobs fail loudly by
-design. **Add no protection rules** — required reviewers or a wait timer would
-block every push and every PR, since this environment gates CI rather than a
+optionally, a `SHIP_TOKEN` secret. Without the secret the authed leg skips
+with a `::notice`; without the variable both e2e jobs fail loudly by design.
+**Add no protection rules** — required reviewers or a wait timer would block
+every push and every PR, since this environment gates CI rather than a
 release.
+
+Two things about that secret are forced rather than chosen. It is a **`ship-`
+API key, not a `deploy-` token**: deploy tokens carry
+`permissions: { deploy: ['create'] }` and authenticate only on `deployScope`
+routes, which the leg's `ship deployments get` read-back is not. And it
+belongs to a **dedicated dev CI account**, never the operator's — a public
+repo's CI must not hold a human's admin credential, and `PUT /account/key` is
+an upsert that sweeps the account's existing key, so minting one for CI on a
+shared account would revoke the operator's. That account's deployment cap
+carries an override for the fence's burst, the same mechanism the dev PUBLIC
+account uses for the anonymous leg.
 
 ## Tooling standard
 
