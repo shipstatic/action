@@ -342,6 +342,19 @@ paused. **Their `main` merge IS a production deploy**, and beyond the `@v2` +
 them — the same ownership rule. Operator-gated; the checklist lives in root
 `backlog.md`.
 
+## Post-launch: the deployment record guesses its environment
+
+`environment` on the GitHub Deployment record is derived as
+`pull_request ? "preview" : "production"` — the action has no notion of a
+non-production branch, so every dev-environment push across the four
+first-party consumers (my, www, docs, the action's own fence) writes a
+record claiming `production`. Cosmetic — the deploy itself is correct — but
+the sidebar lies on every dev push. The fix is a v2.x minor: an optional
+`environment:` input consumed ONLY by the record step (the one place the
+action currently guesses), defaulting to today's derivation so existing
+consumers see no change. Found 2026-08-11 during the web/my rollout; fix in
+the action, never a workaround in consumers.
+
 ## Pointers
 
 | What | Where |
