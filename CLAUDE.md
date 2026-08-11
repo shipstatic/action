@@ -104,6 +104,7 @@ Every absence below is a decision; see "Recorded absences".
 | `labels` | — | Comma-separated → repeated `--label`, appended after the automatic short SHA |
 | `idempotency-key` | *derived* | Override; else `<repo>-<run id>-<job id>` → `SHIP_IDEMPOTENCY_KEY` |
 | `github-token` | — | Enables the deployment record + the sticky PR comment |
+| `environment` | *derived* | The record's environment name; read ONLY by the record step, so it does nothing without `github-token` |
 
 | Output | Source |
 |---|---|
@@ -362,24 +363,42 @@ belonged to `public@shipstatic.com`, and since the public identity can hold no
 API key, **no credential could have linked it** — a domain is linkable only by
 the account that owns it.
 
-`web/www` and `web/docs` (`deploy.yml`, prod domains) are still on `@v1` and
-paused. **Their `main` merge IS a production deploy**, and beyond the `@v2` +
-`token:` flip they need their prod domains moved to whichever account deploys
-them — the same ownership rule. Operator-gated; the checklist lives in root
-`backlog.md`.
+`web/my`, `web/www` and `web/docs` all ship themselves through `@v2` since
+2026-08-11 — a push to `development` deploys the dev site, and **the merge to
+`main` IS the production deploy**, which is why every such merge is
+operator-timed. Their domains belong to the dedicated `sites@shipstatic.{dev,com}`
+accounts, since a domain is linkable only by its owner.
 
-## Post-launch: the deployment record guesses its environment
+## Post-launch: OIDC trusted deploying
 
-`environment` on the GitHub Deployment record is derived as
-`pull_request ? "preview" : "production"` — the action has no notion of a
-non-production branch, so every dev-environment push across the four
-first-party consumers (my, www, docs, the action's own fence) writes a
-record claiming `production`. Cosmetic — the deploy itself is correct — but
-the sidebar lies on every dev push. The fix is a v2.x minor: an optional
-`environment:` input consumed ONLY by the record step (the one place the
-action currently guesses), defaulting to today's derivation so existing
-consumers see no change. Found 2026-08-11 during the web/my rollout; fix in
-the action, never a workaround in consumers.
+**The 2026 endgame for this action class is the runner's own OIDC token
+exchanged for a short-lived platform credential — no `SHIP_TOKEN` secret in any
+consumer at all.** It is the exact religion the estate already practices from
+the other side: the npm publish law abandoned long-lived tokens for trusted
+publishing, and this is that law read from the consuming end.
+
+It needs platform work before it can be an action change — an exchange endpoint
+that verifies GitHub's OIDC JWT, and a repository↔account binding a user
+creates once in the dashboard — so it is a **product decision, not an action
+wave**. Recorded here because of what it dissolves: the long-lived secret class
+entirely, and with it the key-rotation hygiene that follows every credential
+that has ever appeared in a log, a transcript or a screen share.
+
+The `environment:` input that used to sit in this section shipped in **v2.1.0**:
+the record step's `pull_request ? preview : production` guess called every dev
+push `production`, true of the deploy and false of the record. It is now the
+fallback, and a consumer that names its environment gets it recorded.
+
+**A consumer whose job declares `environment:` should not pass `github-token`
+on a push at all** — GitHub writes that job's deployment record itself, so the
+token buys a SECOND record for the same deploy. The input serves the consumer
+this action was designed for: the quickstart workflow with no environments,
+where the record step is the only thing writing one.
+
+Both GitHub-side conveniences (the record, the sticky comment) remain
+**unfenced by decision** — a bespoke harness for three rarely-changing shell
+lines is machinery the estate's idiom refuses — so the new input rides that same
+recorded call.
 
 ## Pointers
 

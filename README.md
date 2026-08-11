@@ -81,11 +81,14 @@ A deploy-only workflow can run on a deploy token. This action never reads your a
 | `labels` | No | — | Comma-separated labels, added to the automatic commit label |
 | `idempotency-key` | No | *derived* | Override the replay key (see below) |
 | `github-token` | No | — | GitHub token for PR comments and deployment tracking |
+| `environment` | No | *derived* | Environment name for the deployment record — `preview` on pull requests, `production` otherwise |
 
 The `github-token` input enables two features:
 
 - **PR comments** — posts the deployment URL as a single comment, updated in place on every push
 - **GitHub Deployments** — creates deployment objects visible in the repo sidebar
+
+If your job already declares an [`environment:`](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment), GitHub records the deployment for you — omit `github-token` on pushes rather than creating a second record. `environment:` on this action names the environment for the record it creates, for workflows that have none of their own.
 
 Use the automatic `${{ secrets.GITHUB_TOKEN }}` — no extra secrets needed. Your workflow needs these permissions:
 

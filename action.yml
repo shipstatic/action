@@ -30,6 +30,9 @@ inputs:
   github-token:
     description: 'GitHub token for PR comments and deployment tracking'
     required: false
+  environment:
+    description: 'Environment name for the GitHub deployment record. Defaults to preview on pull requests and production otherwise. Only read when github-token is set.'
+    required: false
 
 outputs:
   deployment:
@@ -186,8 +189,17 @@ runs:
         GH_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         GH_EVENT: ${{ github.event_name }}
         DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+        ENVIRONMENT: ${{ inputs.environment }}
       run: |
-        ENVIRONMENT=$([[ "$GH_EVENT" == "pull_request" ]] && echo "preview" || echo "production")
+        # The consumer names the environment when it has one; the derivation is
+        # the fallback for the quickstart consumer that does not. The action
+        # has no notion of a non-production branch, so the guess called every
+        # dev push `production` — true of the deploy, false of the record.
+        # A workflow that declares `environment:` gets GitHub's own record and
+        # should not pass `github-token` at all; this input is for the rest.
+        if [ -z "$ENVIRONMENT" ]; then
+          ENVIRONMENT=$([[ "$GH_EVENT" == "pull_request" ]] && echo "preview" || echo "production")
+        fi
         PAYLOAD=$(jq -n --arg ref "$GH_SHA" --arg env "$ENVIRONMENT" \
           '{ref: $ref, environment: $env, auto_merge: false, required_contexts: []}')
         ID=$(echo "$PAYLOAD" | gh api "repos/$GH_REPO/deployments" --input - --jq '.id')
