@@ -68,6 +68,7 @@ runs:
         SHIP_PASSWORD: ${{ inputs.password }}
         SHIP_VIA: git
         DEPLOY_PATH: ${{ inputs.path }}
+        DOMAIN: ${{ inputs.domain }}
         LABELS: ${{ inputs.labels }}
         IDEMPOTENCY_KEY: ${{ inputs.idempotency-key }}
         GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -111,12 +112,59 @@ runs:
         # reassembled from the hostname: the response owns its own URL, and a
         # client that rebuilds one is a client that disagrees with the platform
         # the day the shape changes.
+        DEPLOYMENT=$(jq -r '.deployment // empty' <<< "$OUTPUT")
+        URL=$(jq -r '.url // empty' <<< "$OUTPUT")
+        CLAIM=$(jq -r '.claim // empty' <<< "$OUTPUT")
+        EXPIRES=$(jq -r '.expires // empty' <<< "$OUTPUT")
+
+        # The expiry is rendered HERE, where the timestamp is read, and the PR
+        # comment consumes the rendered string rather than repeating the
+        # incantation. One `date` invocation in this file, one owner. A
+        # relative duration would be stale the moment it is read; this is the
+        # wire's own `expires` as a real date.
+        EXPIRES_AT=""
+        if [ -n "$EXPIRES" ]; then
+          EXPIRES_AT=$(date -u -d "@$EXPIRES" '+%-d %B %Y, %H:%M UTC' 2>/dev/null \
+                    || date -u -r "$EXPIRES" '+%-d %B %Y, %H:%M UTC')
+        fi
+
         {
-          echo "deployment=$(jq -r '.deployment // empty' <<< "$OUTPUT")"
-          echo "url=$(jq -r '.url // empty' <<< "$OUTPUT")"
-          echo "claim=$(jq -r '.claim // empty' <<< "$OUTPUT")"
-          echo "expires=$(jq -r '.expires // empty' <<< "$OUTPUT")"
+          echo "deployment=$DEPLOYMENT"
+          echo "url=$URL"
+          echo "claim=$CLAIM"
+          echo "expires=$EXPIRES"
+          echo "expires-at=$EXPIRES_AT"
         } >> "$GITHUB_OUTPUT"
+
+        # The run page says what happened, and the ACTION says it — otherwise
+        # every serious consumer writes this table itself, which is exactly
+        # what happened before this existed. `$GITHUB_STEP_SUMMARY` is the
+        # first-party furniture of the era (`actions/deploy-pages`,
+        # `attest-build-provenance`), and it is inert: no opt-out knob, since
+        # nothing downstream can depend on it.
+        #
+        # It lives INSIDE this step rather than in a sixth one. Each step gets
+        # its own summary FILE and the job concatenates them, so a table split
+        # across two steps would not render as one table — and the five-step
+        # shape is fenced, so a step is a design change rather than an edit.
+        # `domain` is therefore the input, not a wire value: the link happens
+        # one step later, and a failed link fails the job loudly beneath this.
+        #
+        # Every row is an `if`, never `[ -n "$X" ] && echo`: a trailing test
+        # that fails is the block's exit status under `bash -e`.
+        {
+          echo "| | |"
+          echo "|---|---|"
+          echo "| Deployment | \`$DEPLOYMENT\` |"
+          echo "| URL | $URL |"
+          if [ -n "$DOMAIN" ]; then
+            echo "| Domain | https://$DOMAIN |"
+          fi
+          if [ -n "$CLAIM" ]; then
+            echo "| Claim | $CLAIM |"
+            echo "| Expires | $EXPIRES_AT |"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Link domain
       if: ${{ inputs.token != '' && inputs.domain != '' && steps.deploy.outputs.deployment != '' }}
@@ -157,7 +205,7 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         DEPLOY_URL: ${{ steps.deploy.outputs.url }}
         CLAIM_URL: ${{ steps.deploy.outputs.claim }}
-        EXPIRES: ${{ steps.deploy.outputs.expires }}
+        EXPIRES_AT: ${{ steps.deploy.outputs.expires-at }}
       run: |
         # One comment per PR, updated in place on every push. The marker is what
         # makes that safe: `gh pr comment --edit-last` edits the authenticated
@@ -166,16 +214,14 @@ runs:
         # other. Finding our own comment by marker cannot.
         MARKER='<!-- shipstatic/action -->'
 
-        # The expiry is the wire's `expires`, rendered as a real date. A
-        # hand-written "expires in 3 days" is stale the moment it is read, and
-        # this file has no compiler and no test runner to hold a copy honest —
-        # the only duration it can state truthfully forever is one it read off
-        # the response.
+        # The expiry is the wire's `expires`, rendered as a real date by the
+        # deploy step and read back here. A hand-written "expires in 3 days" is
+        # stale the moment it is read, and this file has no compiler and no
+        # test runner to hold a copy honest — the only duration it can state
+        # truthfully forever is one it read off the response.
         NOTE=""
-        if [ -n "$EXPIRES" ]; then
-          WHEN=$(date -u -d "@$EXPIRES" '+%-d %B %Y, %H:%M UTC' 2>/dev/null \
-              || date -u -r "$EXPIRES" '+%-d %B %Y, %H:%M UTC')
-          NOTE="Expires $WHEN — [claim this deployment]($CLAIM_URL) to keep it."
+        if [ -n "$EXPIRES_AT" ]; then
+          NOTE="Expires $EXPIRES_AT — [claim this deployment]($CLAIM_URL) to keep it."
         fi
 
         if [ -n "$NOTE" ]; then

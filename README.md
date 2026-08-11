@@ -113,6 +113,8 @@ permissions:
       - run: echo "Live at ${{ steps.deploy.outputs.url }}"
 ```
 
+Every deploy also writes a summary table to the workflow run page — the deployment, its URL, the domain when one is linked, and for anonymous deploys the claim link and expiry.
+
 ## Labels
 
 Every deployment is labelled with the commit's short SHA automatically. `labels` adds your own on top:

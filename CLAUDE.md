@@ -113,8 +113,34 @@ Every absence below is a decision; see "Recorded absences".
 | `expires` | `jq -r '.expires // empty'` — unix seconds; feeds the comment's date |
 
 Automatic, no knob: `SHIP_VIA=git` · the commit short-SHA label · the derived
-idempotency key · SPA detection and junk filtering (the CLI's defaults;
-`ship.json` is the override).
+idempotency key · the run summary · SPA detection and junk filtering (the CLI's
+defaults; `ship.json` is the override).
+
+### The run summary belongs to the action
+
+`$GITHUB_STEP_SUMMARY` is the first-party furniture of the era
+(`actions/deploy-pages`, `attest-build-provenance`), and a deploy action that
+says nothing on the run page makes every serious consumer write its own table —
+which is precisely what `web/my` had done. So the action writes it: deployment,
+URL, the domain when one was asked for, and for an anonymous deploy the claim
+link and the rendered expiry. **No opt-out knob** — a summary is inert, and
+nothing downstream can depend on it.
+
+Two mechanical facts shape where it lives:
+
+- **Inside the Deploy step, not a sixth step.** Each step gets its own summary
+  FILE which the job concatenates for display, so a table split across two steps
+  does not render as one table. And the five-step shape is fenced, which makes a
+  step a design change rather than an edit.
+- **The `Domain` row is the INPUT**, the one row not read off the wire — the
+  link happens one step later. A failed link fails the job loudly directly
+  beneath the summary, which is the honest place for it.
+
+The expiry is rendered **once**, in the Deploy step where the timestamp is read,
+and exposed as an internal `expires-at` step output the PR comment consumes. Two
+copies of a `date -u -d @…` incantation in one file is the same drift class this
+repo removed from `url` and the hardcoded "3 days"; the step output is not part
+of the published surface (`outputs:` is unchanged).
 
 ### Everything is read off the wire
 
