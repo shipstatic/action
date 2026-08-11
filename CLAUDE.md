@@ -217,9 +217,13 @@ Four things about it are deliberate:
   reaped — floored at one hour so a concurrent run cannot reap a sibling's row
   mid-verification. It is the repo's one destructive CI step, which is why it
   sits *after* the environment guard: with no `SHIP_API_URL` it would prune
-  production. Every part of it is best-effort, because a prune that cannot run
-  must not redden a run that otherwise proves the action works — a real outage
-  fails loudly one step later, on the deploy.
+  production. Running before the action also means the CLI is not on the runner
+  yet, so the step installs it — **deriving the pin from `action.yml` with the
+  same grep the `lint` job uses**, never restating `@2`, because a second copy
+  of the pin in this file is the one drift the ship-major fence cannot see.
+  Every part of it is best-effort, because a prune that cannot run must not
+  redden a run that otherwise proves the action works — a real outage fails
+  loudly one step later, on the deploy.
 - **The jobs refuse an unconfigured environment.** With no `SHIP_API_URL` the
   CLI would fall back to production, and `development` CI would deploy junk
   into the live public account on every push.
