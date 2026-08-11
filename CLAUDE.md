@@ -222,7 +222,7 @@ it*, so on a PR where any other workflow also comments as
 |---|---|
 | `lint` | actionlint over `.github/workflows/**`; the install line names ship major 2; the action is five shell steps |
 | `e2e-anonymous` | Deploys `fixture/` keyless to dev; asserts all four outputs, that `url` addresses `deployment`, that claim + expires are both present, that the URL serves 200 — and that a SECOND same-job invocation REPLAYS the first deployment rather than creating one (the derived key's documented same-job collapse, used as the fence for the silent class: an unread `SHIP_IDEMPOTENCY_KEY` would keep succeeding and simply duplicate) |
-| `e2e-authenticated` | Prunes earlier fence rows, then deploys with a token; asserts the deployment is **not** claimable or expiring, and reads `via` and both labels back from the API |
+| `e2e-authenticated` | Deploys with a token; asserts the deployment is **not** claimable or expiring, and reads `via` and both labels back from the API |
 
 Four things about it are deliberate:
 
@@ -230,27 +230,19 @@ Four things about it are deliberate:
   deploy succeeded" proves nothing here: fail-closed anonymity means a
   credential the CLI does not read still produces a clean 201. Only *no claim,
   no expiry* proves the token was read.
-- **The authed leg prunes at the START, never at the end.** It adds one owned
-  row per push, owned deployments never expire, and the plan cap counts every
-  row whatever its status — so the leg cleans up after itself or goes red on a
-  schedule rather than on a defect. Deleting its *own* row at the end would
-  break the property the derived idempotency key exists to provide: a re-run
-  carries the same key, so the API replays the original 201, which would then
-  name a row the previous attempt had deleted, and the read-back would 404.
-  Pruning at the start only ever touches earlier runs' rows, whose keys are
-  already stale. The selector is the `ci-fence` label the leg already deploys
-  with — load-bearing rather than convenient, since the CI account is the
-  estate's shared dev e2e identity and only rows this fence made may be
-  reaped — floored at one hour so a concurrent run cannot reap a sibling's row
-  mid-verification. It is the repo's one destructive CI step, which is why it
-  sits *after* the environment guard: with no `SHIP_API_URL` it would prune
-  production. Running before the action also means the CLI is not on the runner
-  yet, so the step installs it — **deriving the pin from `action.yml` with the
-  same grep the `lint` job uses**, never restating `@2`, because a second copy
-  of the pin in this file is the one drift the ship-major fence cannot see.
-  Every part of it is best-effort, because a prune that cannot run must not
-  redden a run that otherwise proves the action works — a real outage fails
-  loudly one step later, on the deploy.
+- **The authed leg's rows accumulate, and that is accepted rather than
+  overlooked** (operator decision 2026-08-12). It adds one owned row per push,
+  owned deployments never expire, and the plan cap counts every row whatever
+  its status, so the CI account fills on a schedule. A start-of-job prune on
+  the `ci-fence` label lived here and was removed together with the three
+  copies it had propagated into the site repos: a first-party workflow carrying
+  private bash for a product the platform does not offer is anti-dogfooding,
+  and the day this cap fires is honest usage data for a retention feature
+  (`prune --keep`, or an account-level policy) rather than a fence defect.
+  **This repo is the fastest of the four to get there** — one row per push to a
+  capped CI account. When it fires the deploy 403s with the platform's own
+  message, and the sweep is manual on the `ci-fence` label the leg still
+  deploys with.
 - **The jobs refuse an unconfigured environment.** With no `SHIP_API_URL` the
   CLI would fall back to production, and `development` CI would deploy junk
   into the live public account on every push.
