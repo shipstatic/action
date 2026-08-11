@@ -241,9 +241,11 @@ jobs:
           # Best-effort throughout: a prune that cannot run must never redden a
           # run that otherwise proves the action works. A real outage still
           # fails loudly one step below, on the deploy — which is the honest
-          # place for it. `run:` is `bash -eo pipefail`, so the install, the
-          # listing and each delete are all asked for by name rather than left
-          # to abort the step from inside a pipeline.
+          # place for it. A workflow `run:` is `bash -e` — pipefail is what
+          # `shell: bash` would add, and this step does not ask for it — so a
+          # `ship … | jq …` would report JQ's status and swallow a failed
+          # listing outright. The install, the listing and each delete are
+          # therefore each asked for by name.
 
           # The CLI is not on the runner yet: the action installs it, and the
           # action is what runs AFTER this step. Take the pin from `action.yml`
