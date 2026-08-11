@@ -1,0 +1,179 @@
+# THROWAWAY. This file proves the three product paths `ci.yml` does not fence
+# — password, domain link, sticky PR comment — once, against dev, through the
+# action itself. It must NEVER merge: it is deleted with its branch the moment
+# the three legs are green.
+#
+# They stay unfenced afterwards by decision (see CLAUDE.md, "The fence"): a
+# bespoke harness for three rarely-changing shell lines is machinery the
+# estate's idiom refuses. This is a proof, not a fence.
+#
+# `pull_request` is the only trigger because `workflow_dispatch` is only
+# reachable for workflows present on the DEFAULT branch, and this file is
+# never going there.
+name: Verify
+
+on:
+  pull_request:
+
+jobs:
+  # LEG 1 — the password round-trip.
+  #
+  # The password is generated HERE rather than supplied, so "the run log must
+  # never echo it" is structural rather than something to be careful about.
+  # Knowing it is unnecessary: the proof is the LOCK, and an unprotected
+  # deployment serves 200, so 401 is reachable only if the action forwarded it.
+  password:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: development
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Mint a throwaway password
+        id: pw
+        run: |
+          PW=$(openssl rand -hex 16)
+          echo "::add-mask::$PW"
+          echo "value=$PW" >> "$GITHUB_OUTPUT"
+
+      - uses: ./
+        id: deploy
+        with:
+          api-url: ${{ vars.SHIP_API_URL }}
+          path: fixture
+          password: ${{ steps.pw.outputs.value }}
+
+      - name: The deployment is locked without the password
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          test -n "$URL" || { echo "::error::url output is empty"; exit 1; }
+
+          # --retry-all-errors would retry away the 401 being asked for, so
+          # this waits for propagation on its own terms and reads once.
+          sleep 5
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' --location "$URL")
+          if [ "$CODE" != "401" ]; then
+            echo "::error::$URL answered $CODE without the password — expected 401; the password did not reach the deployment"
+            exit 1
+          fi
+          echo "$URL is locked (401 without the password)"
+
+  # LEG 2 — the domain-link step. The one leg needing a credential: linking is
+  # beyond a deploy token's scope and impossible anonymously.
+  domain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: development
+    env:
+      SHIP_TOKEN: ${{ secrets.SHIP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - if: env.SHIP_TOKEN == ''
+        run: |
+          echo "::error::no SHIP_TOKEN in the development environment — leg 2 cannot run"
+          exit 1
+
+      # DERIVED, never written down. A dev hostname in a tracked file of a
+      # PUBLIC repo would break the public-value law; the environment already
+      # owns the dimension, so the fence name is built from it.
+      - name: Derive the fence domain from the environment
+        id: d
+        env:
+          API_URL: ${{ vars.SHIP_API_URL }}
+        run: echo "name=action-fence.${API_URL#https://api.}" >> "$GITHUB_OUTPUT"
+
+      - uses: ./
+        id: deploy
+        with:
+          token: ${{ secrets.SHIP_TOKEN }}
+          api-url: ${{ vars.SHIP_API_URL }}
+          path: fixture
+          domain: ${{ steps.d.outputs.name }}
+          labels: ci-fence
+
+      - name: The domain serves the deployment the action linked
+        env:
+          DOMAIN: ${{ steps.d.outputs.name }}
+          DEPLOYMENT: ${{ steps.deploy.outputs.deployment }}
+        run: |
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 2 \
+            --retry-all-errors --output /dev/null "https://$DOMAIN"
+
+          # Serving is not enough on its own: the name could still be pointing
+          # at some earlier deployment. Read the link back from the API.
+          LINKED=$(ship domains get "$DOMAIN" --json --no-color | jq -r '.deployment')
+          if [ "$LINKED" != "$DEPLOYMENT" ]; then
+            echo "::error::$DOMAIN is linked to '$LINKED', not the deployment this run made ('$DEPLOYMENT')"
+            exit 1
+          fi
+          echo "https://$DOMAIN serves $DEPLOYMENT"
+
+      # The fence owns its own cleanup; `always()` so a failed assertion above
+      # still leaves no dev domain behind.
+      - name: Release the fence domain
+        if: always() && steps.d.outputs.name != ''
+        env:
+          DOMAIN: ${{ steps.d.outputs.name }}
+        run: ship domains delete "$DOMAIN" --json --no-color || echo "::warning::could not delete $DOMAIN"
+
+  # LEG 3 — the sticky PR comment, live. Anonymous on purpose: only an
+  # anonymous deployment carries `expires`, which is what makes the comment
+  # render a real DATE and a claim link. Push a second commit to the PR and the
+  # count below must STILL be 1 — that is the in-place proof.
+  comment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: development
+    permissions:
+      contents: read
+      pull-requests: write
+      deployments: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./
+        id: deploy
+        with:
+          api-url: ${{ vars.SHIP_API_URL }}
+          path: fixture
+          github-token: ${{ github.token }}
+
+      - name: Exactly one marked comment, carrying this run's URL and a real date
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CLAIM: ${{ steps.deploy.outputs.claim }}
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          MARKER='<!-- shipstatic/action -->'
+          IDS=$(gh api --paginate "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
+            --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id")
+          COUNT=$(printf '%s\n' "$IDS" | grep -c . || true)
+          if [ "$COUNT" != "1" ]; then
+            echo "::error::expected exactly 1 marked comment, found $COUNT — the sticky comment duplicated instead of updating in place"
+            exit 1
+          fi
+
+          ID=$(printf '%s\n' "$IDS" | head -1)
+          BODY=$(gh api "repos/$GH_REPO/issues/comments/$ID" --jq '.body')
+          echo "--- comment $ID ---"; echo "$BODY"; echo "-------------------"
+
+          # The body must name THIS run's deployment, which is what makes the
+          # second push a real update rather than a stale comment left alone.
+          case "$BODY" in
+            *"$URL"*) ;;
+            *) echo "::error::the comment does not carry this run's deploy URL ($URL)"; exit 1 ;;
+          esac
+          case "$BODY" in
+            *"$CLAIM"*) ;;
+            *) echo "::error::the comment's claim link does not match the claim output"; exit 1 ;;
+          esac
+          # A real rendered date — v1 hardcoded "Expires in 3 days".
+          if ! printf '%s' "$BODY" | grep -qE 'Expires [0-9]{1,2} [A-Z][a-z]+ [0-9]{4}, [0-9]{2}:[0-9]{2} UTC'; then
+            echo "::error::the comment does not render a real expiry date"
+            exit 1
+          fi
+          echo "comment $ID: unique, names this run's URL, claim link matches, real date"
