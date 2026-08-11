@@ -63,12 +63,41 @@ publish law", for the mechanisms this one is the smallest instance of.
 - The gate before any tag is `ci.yml` green **on the tagged commit**.
 
 There is deliberately **no release workflow**. A two-file repo does not earn
-one, and the ritual is two commands:
+one, and the ritual is three commands:
 
 ```bash
 git tag -a v2.0.1 -m "v2.0.1" && git push origin v2.0.1
+gh release create v2.0.1 --verify-tag --title v2.0.1 --notes "…"
 git tag -f -a v2  -m "v2 → v2.0.1" && git push -f origin v2
 ```
+
+### The Release object is part of the tag, the way the registry entry is part of a publish
+
+The middle command was missing until 2026-08-12, and its absence was load-bearing
+in a way "the release IS the tag" hid: `v1.2.0`, `v1.2.1` and `v2.0.0` were
+tag-only, so the repo's **Latest release badge still said `v1.1.0` (April)** and
+**the Marketplace listing — whose version comes from Releases — offered the 1.x
+action for a 2.x platform.** Dependabot and Renovate key their bumps and their
+release notes off Releases too, so a tag-only version is invisible to the entire
+consuming ecosystem.
+
+This is not a new mechanism and not automation: it is the artifact GitHub's own
+tag ritual produces, the same way `npm publish` produces a registry entry.
+
+**Every `vX.Y.Z` tag gets a Release from here on.** The catch-up covered the two
+tags still in service — `v1.2.1` (what `@v1` serves) and `v2.0.0` — and
+**order and `--latest=false` are load-bearing**, because GitHub hands Latest to
+the most recently CREATED release whatever its version:
+
+```bash
+gh release create v1.2.1 --verify-tag --latest=false --title v1.2.1 --notes "…"
+gh release create v2.0.0 --verify-tag --latest=false --title v2.0.0 --notes "…"
+# …the current version last, WITHOUT the flag — it becomes Latest.
+```
+
+Dead historical tags (`v1.1.1`, `v1.1.2`, `v1.2.0`) stay Release-less by
+decision: nothing points at them and backfilling a storefront with versions
+nobody may install is noise.
 
 ### v1 is maintained by never touching it again
 

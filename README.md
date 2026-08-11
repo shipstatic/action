@@ -178,7 +178,7 @@ GitHub-hosted runners need nothing. Self-hosted runners need **Node.js 20 or new
 
 ## Versioning
 
-`@v2` is a moving tag that always points at the latest 2.x release, and it speaks the ShipStatic **2.x** platform — the action's major and the platform major it targets are the same number, by design. Pin `@v2.0.0` for an immutable reference.
+`@v2` is a moving tag that always points at the latest 2.x release, and it speaks the ShipStatic **2.x** platform — the action's major and the platform major it targets are the same number, by design. Pin an exact `@vX.Y.Z` tag for an immutable reference, or `@<full-sha>` if your supply-chain policy requires actions pinned by commit.
 
 `@v1` is frozen and speaks the 1.x platform. It receives no changes.
 
