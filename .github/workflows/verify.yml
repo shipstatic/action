@@ -95,6 +95,9 @@ jobs:
 
       - name: The domain serves the deployment the action linked
         env:
+          # The action gets this through its own input; a bare `ship` here does
+          # NOT inherit it, and would speak to production with a dev token.
+          SHIP_API_URL: ${{ vars.SHIP_API_URL }}
           DOMAIN: ${{ steps.d.outputs.name }}
           DEPLOYMENT: ${{ steps.deploy.outputs.deployment }}
         run: |
@@ -115,6 +118,7 @@ jobs:
       - name: Release the fence domain
         if: always() && steps.d.outputs.name != ''
         env:
+          SHIP_API_URL: ${{ vars.SHIP_API_URL }}
           DOMAIN: ${{ steps.d.outputs.name }}
         run: ship domains delete "$DOMAIN" --json --no-color || echo "::warning::could not delete $DOMAIN"
 
