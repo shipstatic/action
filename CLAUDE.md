@@ -328,11 +328,19 @@ Production is the only public value; the dev API URL arrives from the
 
 ## Consumers
 
-`web/www` and `web/docs` (`deploy.yml`, prod domains — **their `main` merge IS
-a production deploy**, so their migration to `@v2` + `token:` belongs to the
-prod-cutover session only) and the five workflows in
-`integrations/action-example`, including `deploy-no-account.yml`, whose
-keyless path only works against a 2.x API.
+`integrations/action-example` — five workflows, all on `@v2` since
+2026-08-11 and all green against production, including
+`deploy-no-account.yml`, whose keyless path only works against a 2.x API. Its
+domain is owned by a dedicated `ci@shipstatic.com` account: it previously
+belonged to `public@shipstatic.com`, and since the public identity can hold no
+API key, **no credential could have linked it** — a domain is linkable only by
+the account that owns it.
+
+`web/www` and `web/docs` (`deploy.yml`, prod domains) are still on `@v1` and
+paused. **Their `main` merge IS a production deploy**, and beyond the `@v2` +
+`token:` flip they need their prod domains moved to whichever account deploys
+them — the same ownership rule. Operator-gated; the checklist lives in root
+`backlog.md`.
 
 ## Pointers
 
