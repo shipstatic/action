@@ -58,9 +58,13 @@ runs:
     # credential variable, so a float across that boundary turns an authenticated
     # deploy into a silent anonymous one. `.github/workflows/ci.yml` fences the
     # major.
+    #
+    # The flags are wrangler-action's, and they are consumer courtesy rather
+    # than speed: without them npm's funding banner and audit summary print
+    # inside every deploy in every consumer's log.
     - name: Install ShipStatic CLI
       shell: bash
-      run: npm install -g @shipstatic/ship@2
+      run: npm install -g @shipstatic/ship@2 --no-fund --no-audit --loglevel=error
 
     - name: Deploy
       id: deploy
