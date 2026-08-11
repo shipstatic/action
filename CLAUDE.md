@@ -33,16 +33,19 @@ that does not gets no signal at all.
 `.github/workflows/ci.yml` holds the law mechanically: the install line must
 name a ship major, and that major must be `2`.
 
-### The beta window
+### The pin
 
-npm ranges never match prereleases, so `@shipstatic/ship@2` resolves nothing
-until `2.0.0` stable exists. Until then the install line pins the **exact**
-current ship beta, and **that line is this repo's constellation pin** — it has
-no manifest, so convergence waves move it by hand alongside cloudflare's. The
-commit that tags `v2.0.0` flips it to `@2`, where it freezes. Both forms pass
-the fence, which checks the major.
+The install line reads `@shipstatic/ship@2` and freezes there for the life of
+this major — **and that line is this repo's constellation pin**, since it has
+no manifest. A range is the right shape precisely because it is a major: every
+2.x fix reaches every `@v2` consumer with no release here, which is the whole
+argument for staying composite.
 
-A version is not an environment value, so the exact pin is lawful in a public
+The fence checks the MAJOR rather than the literal, which is what let the line
+carry an exact `2.0.0-beta.N` while no 2.x stable existed on the registry —
+npm ranges never match prereleases, so `@2` would have resolved nothing.
+
+A version is not an environment value, so either form is lawful in a public
 tree.
 
 ## Releases
@@ -69,36 +72,23 @@ git tag -f -a v2  -m "v2 → v2.0.1" && git push -f origin v2
 
 ### v1 is maintained by never touching it again
 
-**One release remains owed on `main`, and it is a precondition of the ship
-`latest` flip, not a consequence of it.** `v1.2.0` — everything `@v1`
-consumers run today — still installs `@shipstatic/ship@latest`. It must become
-`@shipstatic/ship@1` **before** ship `2.0.0` reaches npm's `latest` tag, or
-every `@v1` consumer silently starts deploying into the public account.
+`v1.2.1` pinned v1's install line to `@shipstatic/ship@1`, and `v1` points at
+it (`fa11a3f`). That release was a **precondition** of the ship `latest` flip
+rather than a consequence of it: `v1.2.0` still installed
+`@shipstatic/ship@latest`, so the moment `2.0.0` reached `latest` every `@v1`
+consumer would have started deploying into the public account, silently. It
+published no behaviour — `@1` resolved the same artifact `latest` did that day.
 
-It publishes no behaviour: `latest` is 1.3.x today and `@1` resolves the same
-artifact. It cannot ride `development`, because `development` now carries v2 —
-it is a one-line commit on `main`, from v1's own content. (`main` also holds
-two untagged README commits past `v1.2.0`; `v1.2.1` carries them, which is
-correct — they are documentation of the behaviour v1 already has.)
+The clock behind it was a demonstrated hazard, not a hypothesis: ship
+`2.0.0-beta.16` sat on the registry with a broken artifact for a window of
+minutes (2026-08). A floating install line's exposure is a proven class.
 
-The clock on this release has a demonstrated hazard behind it, not a
-hypothesis: ship `2.0.0-beta.16` sat on the registry with a broken artifact
-for a window of minutes (2026-08) — a floating install line's exposure is a
-proven class. And the pin freezes a cost that is accepted rather than
-overlooked: keyless `@v1` consumers stay broken against the 2.x API until
+`@v1` is now frozen by its own pin and needs no further attention — and must
+receive none. `v1` is a moving tag resolved by other people's CI, so it is
+never force-pushed backwards. The cost that pin freezes is accepted rather
+than overlooked: keyless `@v1` consumers stay broken against the 2.x API until
 they move to v2 — the platform's recorded pre-launch posture, chosen over
 teaching v1 the 2.x wire.
-
-```bash
-git switch main
-# action.yml: @shipstatic/ship@latest → @shipstatic/ship@1
-git commit -am "v1 pins the ship major it speaks"
-git tag -a v1.2.1 -m "v1.2.1" && git push origin main v1.2.1
-git tag -f -a v1 -m "v1 → v1.2.1" && git push -f origin v1
-```
-
-Verify by re-running any consumer workflow: behaviour must be byte-identical.
-After that, `@v1` is frozen by its own pin and needs no further attention.
 
 ## The v2 surface
 

@@ -49,16 +49,15 @@ runs:
   using: 'composite'
   steps:
     # MAJORS PIN MAJORS. An action whose interface is a contract with a CLI must
-    # name the CLI major it speaks: `@v2` speaks 2.x, forever. `@latest` here
-    # would put whatever the registry serves this minute inside every consumer's
-    # workflow — and the 2.x CLI does not read the 1.x credential variable, so a
-    # float across that boundary turns an authenticated deploy into a silent
-    # anonymous one. During the 2.x beta window this pins the EXACT beta,
-    # because npm ranges never match prereleases; the commit that tags `v2.0.0`
-    # flips it to `@2`. `.github/workflows/ci.yml` fences both forms.
+    # name the CLI major it speaks: `@v2` speaks ship 2.x, and this line says so
+    # in bytes. `@latest` here would put whatever the registry serves this minute
+    # inside every consumer's workflow — and the 2.x CLI does not read the 1.x
+    # credential variable, so a float across that boundary turns an authenticated
+    # deploy into a silent anonymous one. `.github/workflows/ci.yml` fences the
+    # major.
     - name: Install ShipStatic CLI
       shell: bash
-      run: npm install -g @shipstatic/ship@2.0.0-beta.19
+      run: npm install -g @shipstatic/ship@2
 
     - name: Deploy
       id: deploy
