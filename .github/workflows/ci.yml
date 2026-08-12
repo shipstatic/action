@@ -67,18 +67,18 @@ jobs:
           fi
           echo "action.yml pins ship $PIN"
 
-      # The five-step shape, held mechanically. Five shell steps is the
-      # product's whole surface, and a sixth is a design change rather than an
+      # The step-count shape, held mechanically. These shell steps are the
+      # product's whole surface, and one more is a design change rather than an
       # edit — this makes someone say so out loud. It also stands in for the
       # static check this repo does not have: shellcheck reads shell, not YAML,
       # and a bespoke extractor that silently found zero blocks would be a
-      # green fence proving nothing. Deciding to add a step means updating this
-      # number, which is the moment to reread the shell.
-      - name: The action is five shell steps
+      # green fence proving nothing. Deciding to add or remove a step means
+      # updating this number, which is the moment to reread the shell.
+      - name: The action is four shell steps
         run: |
           STEPS=$(grep -c '^      shell: bash$' action.yml || true)
-          if [ "$STEPS" != "5" ]; then
-            echo "::error file=action.yml::expected 5 shell steps, found $STEPS — the five-step shape is part of the contract; update this fence deliberately"
+          if [ "$STEPS" != "4" ]; then
+            echo "::error file=action.yml::expected 4 shell steps, found $STEPS — the step shape is part of the contract; update this fence deliberately"
             exit 1
           fi
 
@@ -198,7 +198,16 @@ jobs:
       - if: env.SHIP_TOKEN == ''
         run: echo "::notice::no SHIP_TOKEN in the development environment — the authenticated leg is unverified"
 
+      # This leg also owns the domain it links, and DERIVES it from the one
+      # environment value already here rather than writing it down: this repo
+      # is public, and production is the only hostname a tracked file may
+      # carry. One owner, no second variable, nothing to configure.
+      #
+      # The domain is self-maintaining — the first run creates it under the CI
+      # account and every later run repoints it, so there is no setup step and
+      # no cleanup step.
       - name: The dev environment is configured
+        id: env
         if: env.SHIP_TOKEN != ''
         env:
           API_URL: ${{ vars.SHIP_API_URL }}
@@ -207,6 +216,7 @@ jobs:
             echo "::error::the development GitHub Environment has no SHIP_API_URL variable. Without it this job would deploy to production"
             exit 1
           fi
+          echo "domain=action-e2e.${API_URL#https://api.}" >> "$GITHUB_OUTPUT"
 
       # This leg adds one owned row per push and owned deployments never
       # expire, so the CI account fills toward its cap — accepted, not
@@ -223,6 +233,7 @@ jobs:
         with:
           token: ${{ secrets.SHIP_TOKEN }}
           api-url: ${{ vars.SHIP_API_URL }}
+          domain: ${{ steps.env.outputs.domain }}
           path: fixture
           labels: ci-fence
 
@@ -268,6 +279,42 @@ jobs:
           expect "the automatic sha label is missing" \
             "$(jq -r --arg s "$SHORT_SHA" '.labels | index($s) != null' <<< "$ROW")" "true"
           echo "owned, via=git, labelled $SHORT_SHA + ci-fence"
+
+      # The collapsed path, proven end to end: ONE invocation deployed and
+      # linked, so the answer is the domain's and the domain really points at
+      # what came back. Three things, because each fails differently — the
+      # output could be the deployment's URL (the flag never reached the CLI),
+      # the domain could be linked but not serving (the platform's own
+      # propagation), or it could serve while pointing at an earlier run's
+      # deployment (the repoint silently no-oped).
+      #
+      # `links` in the printed row is the self-maintaining property, visible:
+      # 1 on the run that created the domain, one more on every run after it.
+      - name: The domain is linked, serving, and points at this deployment
+        if: env.SHIP_TOKEN != ''
+        env:
+          SHIP_API_URL: ${{ vars.SHIP_API_URL }}
+          DOMAIN: ${{ steps.env.outputs.domain }}
+          DEPLOYMENT: ${{ steps.deploy.outputs.deployment }}
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          if [ "$URL" != "https://$DOMAIN" ]; then
+            echo "::error::url ($URL) is not the domain's ($DOMAIN) — the deploy did not answer as the domain, so --domain never reached the CLI"
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 2 \
+            --retry-all-errors --output /dev/null "$URL"
+
+          ROW=$(ship domains get "$DOMAIN" --json --no-color)
+          echo "$ROW"
+
+          LINKED=$(jq -r '.deployment' <<< "$ROW")
+          if [ "$LINKED" != "$DEPLOYMENT" ]; then
+            echo "::error::$DOMAIN points at '$LINKED', not at this run's deployment '$DEPLOYMENT'"
+            exit 1
+          fi
+          echo "$URL serves $DEPLOYMENT"
 
   # The family CI shape: failures notify Slack where the webhook secret is
   # set. One terminal job rather than a step in each — three jobs would mean

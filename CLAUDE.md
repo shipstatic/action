@@ -6,9 +6,9 @@ Claude Code instructions for **`shipstatic/action`** — the GitHub Action.
 
 A **composite** action: `action.yml` plus docs, plus a fixture and a workflow
 that prove them. No build, no manifest, no runtime code. It installs the
-`@shipstatic/ship` CLI on the runner and invokes it twice — deploy, then
-optionally link a domain — and wraps that in two GitHub-side conveniences
-(a deployment record, a sticky PR comment).
+`@shipstatic/ship` CLI on the runner and invokes it **once** — a deploy that
+links a domain when one was asked for — and wraps that in two GitHub-side
+conveniences (a deployment record, a sticky PR comment).
 
 **v2 speaks the 2.x platform.** The action's major and the platform major it
 targets are the same number from here on, which is the versioning law below.
@@ -128,7 +128,7 @@ Every absence below is a decision; see "Recorded absences".
 | `token` | — | One slot, any platform token (`ship-` key or `deploy-` token) → `SHIP_TOKEN`. Absent = anonymous deploy |
 | `api-url` | *the CLI's* | → `SHIP_API_URL`. Empty is absence, so the CLI's own default (production) applies |
 | `path` | `.` | Directory to deploy |
-| `domain` | — | Linked after deploy (requires `token`) |
+| `domain` | — | Passed as `ship --domain`: deployed and linked in ONE invocation. Requires `token` — the CLI refuses before the upload without one |
 | `password` | — | → `SHIP_PASSWORD` (the empty-unset guard stays) |
 | `labels` | — | Comma-separated → repeated `--label`, appended after the automatic short SHA |
 | `idempotency-key` | *derived* | Override; else `<repo>-<run id>-<job id>` → `SHIP_IDEMPOTENCY_KEY` |
@@ -138,7 +138,7 @@ Every absence below is a decision; see "Recorded absences".
 | Output | Source |
 |---|---|
 | `deployment` | `jq -r '.deployment'` — the canonical key |
-| `url` | `jq -r '.url'` — the wire's own, never reconstructed |
+| `url` | `jq -r '.url'` — the wire's own, never reconstructed. With `domain` that is the DOMAIN's URL, since the answer is the domain's |
 | `claim` | `jq -r '.claim // empty'` |
 | `expires` | `jq -r '.expires // empty'` — unix seconds; feeds the comment's date |
 
@@ -146,25 +146,65 @@ Automatic, no knob: `SHIP_VIA=git` · the commit short-SHA label · the derived
 idempotency key · the run summary · SPA detection and junk filtering (the CLI's
 defaults; `ship.json` is the override).
 
+### One invocation, one exit code, one JSON
+
+`domain` is a flag on the deploy, not a second command. Until v2.2 the action
+ran `ship` twice — deploy, then `ship domains set` in a step of its own — and
+collapsing that is the whole shape of this release.
+
+The two-step form was recorded as a deliberate choice days earlier, on two
+arguments. Both were re-examined, and neither survives contact with the actual
+response:
+
+- **"It needs BOTH answers."** It does not. `--domain` answers as the DOMAIN
+  (`DomainSetResult`), and that shape carries `deployment` — the deployment it
+  just linked — and `url`. Those are precisely the two values this action
+  publishes and renders. What it lacks is `claim` and `expires`, and their
+  absence is TRUE rather than lossy: a linked deployment is owned, so it has
+  nothing to claim and no deadline.
+- **"Step-granular failure is the legible shape."** The CLI announces the
+  deployment id in the text channel the moment the upload lands, so a failed
+  link still leaves the id the consumer paid for on screen, and the state it
+  describes — deployed but unlinked — is as valid and as recoverable as it ever
+  was (the derived key replays the upload on re-run). What IS lost is the
+  outputs on that path: one red step publishes none, where deploy-green /
+  link-red published four. Accepted — the job fails either way, so nothing
+  downstream runs to read them.
+
+What the collapse buys is not tidiness:
+
+- **A keyless `domain:` now fails loudly, before a byte uploads.** The old
+  step's `if:` required a token, so `domain` without one deployed anonymously
+  and silently skipped the link — a half-result with no signal anywhere. The
+  CLI refuses the invocation up front instead, because an anonymous account
+  cannot own a domain. This is the one behaviour change a consumer can observe,
+  and it is strictly better than the silence it replaces.
+- **`url` is the address that was asked for** — the domain's, not the
+  deployment hostname's, whenever a domain was named.
+- **One process, one exit code, one JSON**, and with them one credential
+  wiring, one `api-url`, one step to read.
+
 ### The run summary belongs to the action
 
 `$GITHUB_STEP_SUMMARY` is the first-party furniture of the era
 (`actions/deploy-pages`, `attest-build-provenance`), and a deploy action that
 says nothing on the run page makes every serious consumer write its own table —
 which is precisely what `web/my` had done. So the action writes it: deployment,
-URL, the domain when one was asked for, and for an anonymous deploy the claim
-link and the rendered expiry. **No opt-out knob** — a summary is inert, and
-nothing downstream can depend on it.
+URL, and — where the wire carries them — the claim link and the rendered
+expiry. **No opt-out knob** — a summary is inert, and nothing downstream can
+depend on it.
 
 Two mechanical facts shape where it lives:
 
-- **Inside the Deploy step, not a sixth step.** Each step gets its own summary
+- **Inside the Deploy step, not a fifth step.** Each step gets its own summary
   FILE which the job concatenates for display, so a table split across two steps
-  does not render as one table. And the five-step shape is fenced, which makes a
+  does not render as one table. And the step count is fenced, which makes a
   step a design change rather than an edit.
-- **The `Domain` row is the INPUT**, the one row not read off the wire — the
-  link happens one step later. A failed link fails the job loudly directly
-  beneath the summary, which is the honest place for it.
+- **Every row is the wire's own.** A `Domain` row used to sit here — the single
+  value read from the INPUT rather than the response, because the link happened
+  a step later and there was nothing on the wire to show. One invocation
+  answers as the domain, so `URL` *is* the domain's URL and a Domain row would
+  restate it. The exception died with the step that forced it.
 
 The expiry is rendered **once**, in the Deploy step where the timestamp is read,
 and exposed as an internal `expires-at` step output the PR comment consumes. Two
@@ -249,12 +289,21 @@ it*, so on a PR where any other workflow also comments as
 
 | Job | What it holds |
 |---|---|
-| `lint` | actionlint over `.github/workflows/**`; the install line names ship major 2; the action is five shell steps |
+| `lint` | actionlint over `.github/workflows/**`; the install line names ship major 2; the action is four shell steps |
 | `e2e-anonymous` | Deploys `fixture/` keyless to dev; asserts all four outputs, that `url` addresses `deployment`, that claim + expires are both present, that the URL serves 200 — and that a SECOND same-job invocation REPLAYS the first deployment rather than creating one (the derived key's documented same-job collapse, used as the fence for the silent class: an unread `SHIP_IDEMPOTENCY_KEY` would keep succeeding and simply duplicate) |
-| `e2e-authenticated` | Deploys with a token; asserts the deployment is **not** claimable or expiring, and reads `via` and both labels back from the API |
+| `e2e-authenticated` | Deploys with a token AND a domain; asserts the deployment is **not** claimable or expiring, reads `via` and both labels back from the API, and proves the collapsed path — `url` is the domain's, that URL serves 200, and the domain points at this run's deployment |
 
-Four things about it are deliberate:
+Five things about it are deliberate:
 
+- **The e2e domain is DERIVED, never written down.** The authed leg links
+  `action-e2e.${API_URL#https://api.}`, built from the one environment value it
+  already holds, because this repo is PUBLIC and production is the only
+  hostname a tracked file may carry (root `CLAUDE.md`, the public-value law;
+  `scripts/check-public-hygiene.sh` greps for exactly this). A second
+  environment variable would have been a second owner for a fact `SHIP_API_URL`
+  already determines. The domain is self-maintaining — the first run creates it
+  under the CI account, every later run repoints it, no setup and no cleanup —
+  and `links` in the read-back row is that property made visible.
 - **The authed leg's assertion is the INVERSE of the anonymous one.** "The
   deploy succeeded" proves nothing here: fail-closed anonymity means a
   credential the CLI does not read still produces a clean 201. Only *no claim,
@@ -279,7 +328,7 @@ Four things about it are deliberate:
   file, not the product. A bespoke extractor to shellcheck the composite's
   `run:` blocks was considered and declined: one that silently found zero
   blocks would be a green fence proving nothing, and guarding against that
-  turns a 6-line step into a tool. The five-step count stands in for it — the
+  turns a 6-line step into a tool. The step count stands in for it — the
   moment someone must change that number is the moment they reread the shell.
 
 Both e2e jobs are skipped on FORK pull requests, by a job-level `if:` — the
@@ -350,7 +399,7 @@ Production is the only public value; the dev API URL arrives from the
 - **The `SHIP_PASSWORD` empty-unset guard** — defense in depth for whatever
   CLI the pin resolves, even though the 2.x CLI normalizes empty to absence
   itself.
-- **The five-step shape** and `continue-on-error` on the two GitHub-side
+- **The fenced step shape** and `continue-on-error` on the two GitHub-side
   conveniences: a failed comment must never fail a deploy that succeeded.
 - **Anonymous deploy as a first-class path** — the keyless quickstart is a
   product demo, not an accident.
@@ -372,23 +421,10 @@ Production is the only public value; the dev API URL arrives from the
 - **No domain-link output.** The deployment is the product; `domain` is
   routing for it, and the linked URL is `https://<domain>` by construction. An
   output would restate an input.
-- **No `ship --domain`, though the CLI has it.** Since ship 2.2 one command
-  does deploy-and-link (`ship <path> --domain <name>`), and this action keeps
-  its **two** steps deliberately. Two reasons, both structural:
-  - **It needs BOTH answers.** `--domain` answers as the DOMAIN, by design — a
-    composed command's answer is what was asked about. This action publishes
-    the deploy's full JSON as `steps.deploy.outputs` and renders it in the run
-    summary, and the domain-shaped answer carries none of it.
-  - **Step-granular failure is the legible shape here.** Deploy green / link
-    red is what the Actions UI is built to show, and it is exactly the state
-    the platform allows (a deployed-but-unlinked site is valid). One step would
-    collapse that into one red box.
-
-  The trade `--domain` buys — one exit code, no `pipefail` hazard — is a
-  *shell* problem. These are two separate `run:` steps with `needs`-like
-  ordering, not a pipeline, so this action never had it. **Record this before
-  simplifying**: collapsing the steps silently drops the deploy outputs.
-  Revisit if this action ever stops publishing them.
+- **No validation of `domain`.** It is passed through untouched. The CLI
+  refuses `--domain` without a credential, before the upload, and its message
+  relays; a second validator here could only ever disagree with the one that
+  decides. Same law as the labels loop, which trims edges and refuses nothing.
 - **No `via` knob** (law) and **no timeout inputs** (the CLI owns its budgets).
 
 ## Consumers

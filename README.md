@@ -58,6 +58,11 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+`domain` deploys and links in one step: when the action finishes, your site is
+live at that address and the `url` output is your domain's URL. It needs a
+token — a domain belongs to an account — and without one the deploy is refused
+before anything is uploaded, rather than silently landing somewhere else.
+
 ### One slot, two kinds of token
 
 `token` takes either credential ShipStatic issues:
@@ -76,7 +81,7 @@ A deploy-only workflow can run on a deploy token. This action never reads your a
 | `token` | No | — | API key (`ship-…`) or deploy token (`deploy-…`). Omit to deploy anonymously |
 | `api-url` | No | production API | ShipStatic API endpoint |
 | `path` | No | `.` | Directory to deploy |
-| `domain` | No | — | Domain to link (requires `token`) |
+| `domain` | No | — | Domain to serve the deployment at — deployed and linked in one step (requires `token`) |
 | `password` | No | — | Password-protect the deployment (6–128 characters). Visitors are prompted to unlock before viewing |
 | `labels` | No | — | Comma-separated labels, added to the automatic commit label |
 | `idempotency-key` | No | *derived* | Override the replay key (see below) |
@@ -104,7 +109,7 @@ permissions:
 | Output | Description |
 |--------|-------------|
 | `deployment` | Deployment hostname (e.g. `happy-cat-abc1234.shipstatic.com`) |
-| `url` | Deployment URL (e.g. `https://happy-cat-abc1234.shipstatic.com`) |
+| `url` | URL of the deployed site — your domain's URL when `domain` is set, otherwise the deployment's own (e.g. `https://happy-cat-abc1234.shipstatic.com`) |
 | `claim` | Claim URL — anonymous deployments only (visit to keep permanently) |
 | `expires` | Expiry as a unix timestamp in seconds — anonymous deployments only |
 

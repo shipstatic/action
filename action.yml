@@ -16,7 +16,7 @@ inputs:
     required: false
     default: '.'
   domain:
-    description: 'Domain to link to the deployment (requires token)'
+    description: 'Domain to serve this deployment at — deployed and linked in one invocation. Requires token: without one the deploy is refused before anything uploads.'
     required: false
   password:
     description: 'Password-protect the deployment (6–128 characters; whitespace significant). Visitors are prompted to unlock before viewing.'
@@ -39,7 +39,7 @@ outputs:
     description: 'Deployment hostname (e.g. happy-cat-abc1234.shipstatic.com)'
     value: ${{ steps.deploy.outputs.deployment }}
   url:
-    description: 'Deployment URL'
+    description: 'URL of the deployed site — the domain''s URL when domain is set, the deployment''s own otherwise'
     value: ${{ steps.deploy.outputs.url }}
   claim:
     description: 'Claim URL — set for anonymous deployments only (visit to keep permanently)'
@@ -113,6 +113,24 @@ runs:
           done
         fi
 
+        # `--domain` deploys AND links inside this one process, so there is one
+        # exit code and one JSON to read. The answer is then the DOMAIN's, by
+        # the CLI's design — a composed command answers about what was asked
+        # for — and it carries everything this step needs: `.deployment` is the
+        # deployment just linked, `.url` is the address the consumer actually
+        # asked for.
+        #
+        # It is passed whenever the input is set, never gated on the token.
+        # Without a credential the CLI refuses BEFORE a byte uploads, which is
+        # the loud version of what a separate link step used to skip in
+        # silence — deploying anonymously and saying nothing about the domain
+        # that was asked for.
+        #
+        # It is not validated here, exactly like the labels above: the CLI owns
+        # the refusal and its message relays, and a second validator in this
+        # file could only ever disagree with the one that decides.
+        if [ -n "$DOMAIN" ]; then ARGS+=(--domain "$DOMAIN"); fi
+
         OUTPUT=$(ship "$DEPLOY_PATH" "${ARGS[@]}" --json --no-color)
 
         # Every value is read off the wire. `url` in particular is NOT
@@ -150,12 +168,16 @@ runs:
         # `attest-build-provenance`), and it is inert: no opt-out knob, since
         # nothing downstream can depend on it.
         #
-        # It lives INSIDE this step rather than in a sixth one. Each step gets
+        # It lives INSIDE this step rather than in a fifth one. Each step gets
         # its own summary FILE and the job concatenates them, so a table split
-        # across two steps would not render as one table — and the five-step
+        # across two steps would not render as one table — and the four-step
         # shape is fenced, so a step is a design change rather than an edit.
-        # `domain` is therefore the input, not a wire value: the link happens
-        # one step later, and a failed link fails the job loudly beneath this.
+        #
+        # Every row is the wire's own again. `domain` used to need a row of its
+        # own — the one value here read from the input rather than the response
+        # — because the link happened a step later and there was nothing on the
+        # wire to show. With one invocation `URL` IS the domain's URL, and a
+        # Domain row would restate it.
         #
         # Every row is an `if`, never `[ -n "$X" ] && echo`: a trailing test
         # that fails is the block's exit status under `bash -e`.
@@ -164,24 +186,11 @@ runs:
           echo "|---|---|"
           echo "| Deployment | \`$DEPLOYMENT\` |"
           echo "| URL | $URL |"
-          if [ -n "$DOMAIN" ]; then
-            echo "| Domain | https://$DOMAIN |"
-          fi
           if [ -n "$CLAIM" ]; then
             echo "| Claim | $CLAIM |"
             echo "| Expires | $EXPIRES_AT |"
           fi
         } >> "$GITHUB_STEP_SUMMARY"
-
-    - name: Link domain
-      if: ${{ inputs.token != '' && inputs.domain != '' && steps.deploy.outputs.deployment != '' }}
-      shell: bash
-      env:
-        SHIP_TOKEN: ${{ inputs.token }}
-        SHIP_API_URL: ${{ inputs.api-url }}
-        DOMAIN: ${{ inputs.domain }}
-        DEPLOYMENT: ${{ steps.deploy.outputs.deployment }}
-      run: ship domains set "$DOMAIN" "$DEPLOYMENT" --json --no-color
 
     - name: Create GitHub deployment
       if: ${{ inputs.github-token != '' && steps.deploy.outputs.url != '' }}
