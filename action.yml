@@ -19,7 +19,7 @@ inputs:
     description: 'Domain to serve this deployment at — deployed and linked in one invocation. Requires token: without one the deploy is refused before anything uploads.'
     required: false
   ttl:
-    description: 'Deployment time-to-live in seconds — the deployment expires and is cleaned up automatically. Mutually exclusive with domain (the platform refuses the combination).'
+    description: 'Deployment time-to-live in seconds — the deployment expires and is cleaned up automatically. Requires token. Mutually exclusive with domain (the platform refuses the combination).'
     required: false
   password:
     description: 'Password-protect the deployment (6–128 characters; whitespace significant). Visitors are prompted to unlock before viewing.'

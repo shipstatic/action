@@ -115,7 +115,7 @@ To record deployments in your repo's sidebar, declare an [`environment:`](https:
       - run: echo "Live at ${{ steps.deploy.outputs.url }}"
 ```
 
-Every deploy also writes a summary table to the workflow run page — the deployment, its URL, the domain when one is linked, and for anonymous deploys the claim link and expiry.
+Every deploy also writes a summary table to the workflow run page — the deployment and its URL, plus the claim link and the expiry where the deployment has them.
 
 ## Labels
 
