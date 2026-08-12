@@ -82,6 +82,7 @@ A deploy-only workflow can run on a deploy token. This action never reads your a
 | `api-url` | No | production API | ShipStatic API endpoint |
 | `path` | No | `.` | Directory to deploy |
 | `domain` | No | — | Domain to serve the deployment at — deployed and linked in one step (requires `token`) |
+| `ttl` | No | — | Seconds until the deployment expires and is cleaned up (requires `token`; cannot be combined with `domain`) |
 | `password` | No | — | Password-protect the deployment (6–128 characters). Visitors are prompted to unlock before viewing |
 | `labels` | No | — | Comma-separated labels, added to the automatic commit label |
 | `idempotency-key` | No | *derived* | Override the replay key (see below) |
@@ -111,7 +112,7 @@ permissions:
 | `deployment` | Deployment hostname (e.g. `happy-cat-abc1234.shipstatic.com`) |
 | `url` | URL of the deployed site — your domain's URL when `domain` is set, otherwise the deployment's own (e.g. `https://happy-cat-abc1234.shipstatic.com`) |
 | `claim` | Claim URL — anonymous deployments only (visit to keep permanently) |
-| `expires` | Expiry as a unix timestamp in seconds — anonymous deployments only |
+| `expires` | Expiry as a unix timestamp in seconds — set for anonymous deployments and for any deployment given a `ttl` |
 
 ```yaml
       - uses: shipstatic/action@v2
@@ -136,6 +137,33 @@ Every deployment is labelled with the commit's short SHA automatically. `labels`
 ```
 
 Labels are 3–25 characters, lowercase alphanumeric with `.`, `_` or `-` between segments, up to 10 per deployment. Find them again with `ship deployments list`.
+
+## Previews that clean themselves up
+
+`ttl` gives a deployment a lifetime in seconds. When it runs out the platform reclaims the deployment — no cleanup workflow, no `pull_request: closed` handler to maintain:
+
+```yaml
+name: Preview
+on: pull_request
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm ci && npm run build
+      - uses: shipstatic/action@v2
+        with:
+          token: ${{ secrets.SHIP_TOKEN }}
+          path: ./dist
+          ttl: 604800   # one week
+```
+
+`ttl` needs a token — a deployment made without one already expires on the platform's own schedule — and it cannot be combined with `domain`: a domain should not point at something that is about to be reclaimed. The `expires` output carries the deadline as a unix timestamp.
 
 ## Re-running a job does not deploy twice
 

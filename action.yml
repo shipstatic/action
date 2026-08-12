@@ -18,6 +18,9 @@ inputs:
   domain:
     description: 'Domain to serve this deployment at — deployed and linked in one invocation. Requires token: without one the deploy is refused before anything uploads.'
     required: false
+  ttl:
+    description: 'Deployment time-to-live in seconds — the deployment expires and is cleaned up automatically. Mutually exclusive with domain (the platform refuses the combination).'
+    required: false
   password:
     description: 'Password-protect the deployment (6–128 characters; whitespace significant). Visitors are prompted to unlock before viewing.'
     required: false
@@ -45,7 +48,7 @@ outputs:
     description: 'Claim URL — set for anonymous deployments only (visit to keep permanently)'
     value: ${{ steps.deploy.outputs.claim }}
   expires:
-    description: 'Expiry as a unix timestamp in seconds — set for anonymous deployments only'
+    description: 'Expiry as a unix timestamp in seconds — set for anonymous deployments and for any deployment given a ttl'
     value: ${{ steps.deploy.outputs.expires }}
 
 runs:
@@ -76,6 +79,7 @@ runs:
         SHIP_VIA: git
         DEPLOY_PATH: ${{ inputs.path }}
         DOMAIN: ${{ inputs.domain }}
+        TTL: ${{ inputs.ttl }}
         LABELS: ${{ inputs.labels }}
         IDEMPOTENCY_KEY: ${{ inputs.idempotency-key }}
         GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -126,10 +130,12 @@ runs:
         # silence — deploying anonymously and saying nothing about the domain
         # that was asked for.
         #
-        # It is not validated here, exactly like the labels above: the CLI owns
-        # the refusal and its message relays, and a second validator in this
-        # file could only ever disagree with the one that decides.
+        # Neither flag is validated here, exactly like the labels above. The
+        # CLI owns the credential refusal and the platform owns the domain/ttl
+        # exclusion; both messages relay, and a second validator in this file
+        # could only ever disagree with the one that decides.
         if [ -n "$DOMAIN" ]; then ARGS+=(--domain "$DOMAIN"); fi
+        if [ -n "$TTL" ]; then ARGS+=(--ttl "$TTL"); fi
 
         OUTPUT=$(ship "$DEPLOY_PATH" "${ARGS[@]}" --json --no-color)
 
@@ -179,6 +185,11 @@ runs:
         # wire to show. With one invocation `URL` IS the domain's URL, and a
         # Domain row would restate it.
         #
+        # Claim and expiry are two rows on two conditions, not one pair. They
+        # arrived together for as long as only anonymous deployments expired;
+        # `ttl` deploys an OWNED deployment with a deadline and no claim, so
+        # each row now asks about its own value.
+        #
         # Every row is an `if`, never `[ -n "$X" ] && echo`: a trailing test
         # that fails is the block's exit status under `bash -e`.
         {
@@ -188,6 +199,8 @@ runs:
           echo "| URL | $URL |"
           if [ -n "$CLAIM" ]; then
             echo "| Claim | $CLAIM |"
+          fi
+          if [ -n "$EXPIRES_AT" ]; then
             echo "| Expires | $EXPIRES_AT |"
           fi
         } >> "$GITHUB_STEP_SUMMARY"
@@ -244,9 +257,18 @@ runs:
         # stale the moment it is read, and this file has no compiler and no
         # test runner to hold a copy honest — the only duration it can state
         # truthfully forever is one it read off the response.
+        #
+        # Two facts, two conditions — the same split the summary makes. They
+        # were one sentence for as long as `expires` implied `claim`, which was
+        # true while only anonymous deployments expired. A `ttl` deployment is
+        # owned and expiring, so the fused sentence would have rendered a claim
+        # link with an empty href.
         NOTE=""
         if [ -n "$EXPIRES_AT" ]; then
-          NOTE="Expires $EXPIRES_AT — [claim this deployment]($CLAIM_URL) to keep it."
+          NOTE="Expires $EXPIRES_AT."
+        fi
+        if [ -n "$CLAIM_URL" ]; then
+          NOTE="${NOTE:+$NOTE }[Claim this deployment]($CLAIM_URL) to keep it."
         fi
 
         if [ -n "$NOTE" ]; then

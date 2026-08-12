@@ -129,6 +129,7 @@ Every absence below is a decision; see "Recorded absences".
 | `api-url` | *the CLI's* | → `SHIP_API_URL`. Empty is absence, so the CLI's own default (production) applies |
 | `path` | `.` | Directory to deploy |
 | `domain` | — | Passed as `ship --domain`: deployed and linked in ONE invocation. Requires `token` — the CLI refuses before the upload without one |
+| `ttl` | — | Passed as `ship --ttl`, in seconds. Requires `token`; the platform refuses it together with `domain` |
 | `password` | — | → `SHIP_PASSWORD` (the empty-unset guard stays) |
 | `labels` | — | Comma-separated → repeated `--label`, appended after the automatic short SHA |
 | `idempotency-key` | *derived* | Override; else `<repo>-<run id>-<job id>` → `SHIP_IDEMPOTENCY_KEY` |
@@ -140,7 +141,7 @@ Every absence below is a decision; see "Recorded absences".
 | `deployment` | `jq -r '.deployment'` — the canonical key |
 | `url` | `jq -r '.url'` — the wire's own, never reconstructed. With `domain` that is the DOMAIN's URL, since the answer is the domain's |
 | `claim` | `jq -r '.claim // empty'` |
-| `expires` | `jq -r '.expires // empty'` — unix seconds; feeds the comment's date |
+| `expires` | `jq -r '.expires // empty'` — unix seconds; feeds the comment's date. Anonymous deploys AND `ttl` deploys carry one |
 
 Automatic, no knob: `SHIP_VIA=git` · the commit short-SHA label · the derived
 idempotency key · the run summary · SPA detection and junk filtering (the CLI's
@@ -183,6 +184,29 @@ What the collapse buys is not tidiness:
   deployment hostname's, whenever a domain was named.
 - **One process, one exit code, one JSON**, and with them one credential
   wiring, one `api-url`, one step to read.
+
+### A deadline is not a claim
+
+`ttl` is pure passthrough — one env var, one `ARGS+=` line — and it still
+forced a change here, because it produces this platform's first deployment that
+**expires without being claimable**.
+
+Both renderings in this file had fused those two facts into one sentence, and
+were right to: `expires` implied `claim` for as long as only anonymous
+deployments expired, and one constant set both (the anonymous e2e leg asserts
+exactly that pairing). A ttl'd deploy is owned AND expiring, so the fused note
+would have rendered `[claim this deployment]()` — a live link with an empty
+href, in a comment on someone's pull request.
+
+Each value is now asked about on its own: two rows in the summary, and in the
+comment a sentence about the deadline plus a CTA appended only when there is
+something to claim. The drill is both directions — a `ttl` run shows the expiry
+and no claim link, an anonymous run still shows both.
+
+**No e2e leg for `ttl` itself.** The flag either reaches the CLI or it does
+not, and ship's own suite owns every consequence past that point; a leg here
+would deploy a row that expires in order to prove a string was concatenated.
+The rendering split is the only action-owned surface the flag touches.
 
 ### The run summary belongs to the action
 
@@ -421,10 +445,12 @@ Production is the only public value; the dev API URL arrives from the
 - **No domain-link output.** The deployment is the product; `domain` is
   routing for it, and the linked URL is `https://<domain>` by construction. An
   output would restate an input.
-- **No validation of `domain`.** It is passed through untouched. The CLI
-  refuses `--domain` without a credential, before the upload, and its message
-  relays; a second validator here could only ever disagree with the one that
-  decides. Same law as the labels loop, which trims edges and refuses nothing.
+- **No validation of `domain` or `ttl`.** Both are passed through untouched.
+  The CLI refuses `--domain` without a credential, before the upload; the
+  platform refuses the two together. Each message relays, and a second
+  validator here could only ever disagree with the one that decides — including
+  the day the platform relaxes the rule. Same law as the labels loop, which
+  trims edges and refuses nothing.
 - **No `via` knob** (law) and **no timeout inputs** (the CLI owns its budgets).
 
 ## Consumers
