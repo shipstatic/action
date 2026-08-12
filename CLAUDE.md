@@ -133,7 +133,7 @@ Every absence below is a decision; see "Recorded absences".
 | `password` | — | → `SHIP_PASSWORD` (the empty-unset guard stays) |
 | `labels` | — | Comma-separated → repeated `--label`, appended after the automatic short SHA |
 | `idempotency-key` | *derived* | Override; else `<repo>-<run id>-<job id>` → `SHIP_IDEMPOTENCY_KEY` |
-| `github-token` | — | Enables the sticky PR comment, and nothing else |
+| `github-token` | `${{ github.token }}` | Enables the sticky PR comment, and nothing else. Empty = no comment |
 
 | Output | Source |
 |---|---|
@@ -306,7 +306,18 @@ One comment per PR, updated in place, found by a hidden marker
 it*, so on a PR where any other workflow also comments as
 `github-actions[bot]` the two clobber each other.
 
-It is what `github-token` buys, and since **v2.2.0** it is the only thing.
+It is what `github-token` buys, and since **v2.2.0** it is the only thing —
+which is also why that input now defaults to `${{ github.token }}`. An
+expression is legal in an `action.yml` input default and evaluates in the
+CALLER's context, the `actions/stale` and `actions/labeler` convention, so the
+comment appears with zero configuration wherever the workflow's permissions
+allow it and `continue-on-error` keeps a locked-down org green.
+
+**The comment step keeps its non-empty test, and that test is now the opt-out.**
+`github-token: ''` skips the step; deleting the guard would have made the same
+intent a step that fails and is swallowed, and left a default-on side effect on
+someone else's pull requests with no way to say no. The input also survives as
+an override, for the cross-repo token case that motivated it.
 
 ### The deployment record was GitHub's job all along
 

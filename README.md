@@ -23,7 +23,7 @@ Your site is live instantly on `*.shipstatic.com`. No token, no sign-up, no conf
 
 Deployments made without a token are public and expire — the `claim` output holds a URL that keeps the site permanently, and `expires` holds the deadline.
 
-Add `github-token: ${{ secrets.GITHUB_TOKEN }}` to post the URL as a comment on pull requests.
+On pull requests the action comments the URL automatically. Give the workflow `pull-requests: write` and there is nothing else to configure.
 
 ## All Features — Free API Key
 
@@ -54,7 +54,6 @@ jobs:
           token: ${{ secrets.SHIP_TOKEN }}
           path: ./dist
           domain: www.example.com
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 `domain` deploys and links in one step: when the action finishes, your site is
@@ -85,15 +84,17 @@ A deploy-only workflow can run on a deploy token. This action never reads your a
 | `password` | No | — | Password-protect the deployment (6–128 characters). Visitors are prompted to unlock before viewing |
 | `labels` | No | — | Comma-separated labels, added to the automatic commit label |
 | `idempotency-key` | No | *derived* | Override the replay key (see below) |
-| `github-token` | No | — | GitHub token for the PR comment |
+| `github-token` | No | the workflow's own token | GitHub token for the PR comment. Pass an empty string to post no comment |
 
-`github-token` enables one thing: a **PR comment** carrying the deployment URL, posted once and updated in place on every push. Use the automatic `${{ secrets.GITHUB_TOKEN }}` — no extra secrets needed — and give your workflow the permission to write it:
+`github-token` enables one thing: a **PR comment** carrying the deployment URL, posted once and updated in place on every push. It defaults to your workflow's own token, so the only thing to configure is the permission to write with it:
 
 ```yaml
 permissions:
   contents: read
   pull-requests: write
 ```
+
+Pass `github-token: ''` if you would rather the action never commented. Pass a different token to comment on a PR in another repository.
 
 To record deployments in your repo's sidebar, declare an [`environment:`](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) on the job. GitHub writes that record itself, with the environment you named — this action does not write one.
 

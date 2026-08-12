@@ -31,8 +31,9 @@ inputs:
     description: 'Override the derived idempotency key. Defaults to this workflow run + job, so re-running a job replays the original deployment instead of deploying twice. Set one per matrix leg when legs deploy different content.'
     required: false
   github-token:
-    description: 'GitHub token for the PR comment.'
+    description: 'GitHub token for the PR comment. Defaults to the workflow''s own token; pass an empty string to post no comment.'
     required: false
+    default: ${{ github.token }}
 
 outputs:
   deployment:
@@ -203,6 +204,11 @@ runs:
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Comment on PR
+      # `github-token` defaults to the caller's own `${{ github.token }}`, so
+      # this runs with no configuration wherever the workflow's permissions
+      # allow it — and the non-empty test is what keeps `github-token: ''` an
+      # off switch rather than a step that fails and is swallowed by
+      # `continue-on-error`. A default-on side effect needs a way to say no.
       if: ${{ inputs.github-token != '' && steps.deploy.outputs.url != '' && github.event_name == 'pull_request' }}
       continue-on-error: true
       shell: bash
