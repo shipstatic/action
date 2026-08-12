@@ -479,11 +479,13 @@ Production is the only public value; the dev API URL arrives from the
   routing for it, and the linked URL is `https://<domain>` by construction. An
   output would restate an input.
 - **No validation of `domain` or `ttl`.** Both are passed through untouched.
-  The CLI refuses `--domain` without a credential, before the upload; the
-  platform refuses the two together. Each message relays, and a second
-  validator here could only ever disagree with the one that decides — including
-  the day the platform relaxes the rule. Same law as the labels loop, which
-  trims edges and refuses nothing.
+  The exclusivity is already enforced twice below this file — the CLI refuses
+  the combined flags before any upload, and the API's link door makes the state
+  inexpressible (`expires IS NULL` in the ownership query) — and the credential
+  refusal is the CLI's too. Every message relays, and a third validator here
+  could only ever disagree with the two that decide, including on the day the
+  platform relaxes the rule. Same law as the labels loop, which trims edges and
+  refuses nothing.
 - **No `via` knob** (law) and **no timeout inputs** (the CLI owns its budgets).
 
 ## Consumers

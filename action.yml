@@ -6,7 +6,7 @@ branding:
 
 inputs:
   token:
-    description: 'ShipStatic token — an API key (ship-…) or a deploy token (deploy-…). Omit to deploy anonymously: the site is public, expires, and can be claimed.'
+    description: 'Your ShipStatic API key (ship-…), or a scoped deploy token (deploy-…) — one slot takes either. Omit to deploy anonymously: the site is public, expires, and can be claimed.'
     required: false
   api-url:
     description: 'ShipStatic API endpoint. Defaults to the production API.'
@@ -129,9 +129,11 @@ runs:
         # that was asked for.
         #
         # Neither flag is validated here, exactly like the labels above. The
-        # CLI owns the credential refusal and the platform owns the domain/ttl
-        # exclusion; both messages relay, and a second validator in this file
-        # could only ever disagree with the one that decides.
+        # CLI refuses `--domain` without a credential and refuses the two flags
+        # together, both before any upload, and the API's link door makes the
+        # combination inexpressible besides. Every message relays, and a second
+        # validator in this file could only ever disagree with the ones that
+        # decide.
         if [ -n "$DOMAIN" ]; then ARGS+=(--domain "$DOMAIN"); fi
         if [ -n "$TTL" ]; then ARGS+=(--ttl "$TTL"); fi
 

@@ -76,7 +76,7 @@ A deploy-only workflow can run on a deploy token. This action never reads your a
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `token` | No | — | API key (`ship-…`) or deploy token (`deploy-…`). Omit to deploy anonymously |
+| `token` | No | — | Your API key (`ship-…`), or a scoped deploy token (`deploy-…`) — one slot takes either. Omit to deploy anonymously |
 | `api-url` | No | production API | ShipStatic API endpoint |
 | `path` | No | `.` | Directory to deploy |
 | `domain` | No | — | Domain to serve the deployment at — deployed and linked in one step (requires `token`) |
