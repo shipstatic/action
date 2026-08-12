@@ -372,6 +372,23 @@ Production is the only public value; the dev API URL arrives from the
 - **No domain-link output.** The deployment is the product; `domain` is
   routing for it, and the linked URL is `https://<domain>` by construction. An
   output would restate an input.
+- **No `ship --domain`, though the CLI has it.** Since ship 2.2 one command
+  does deploy-and-link (`ship <path> --domain <name>`), and this action keeps
+  its **two** steps deliberately. Two reasons, both structural:
+  - **It needs BOTH answers.** `--domain` answers as the DOMAIN, by design — a
+    composed command's answer is what was asked about. This action publishes
+    the deploy's full JSON as `steps.deploy.outputs` and renders it in the run
+    summary, and the domain-shaped answer carries none of it.
+  - **Step-granular failure is the legible shape here.** Deploy green / link
+    red is what the Actions UI is built to show, and it is exactly the state
+    the platform allows (a deployed-but-unlinked site is valid). One step would
+    collapse that into one red box.
+
+  The trade `--domain` buys — one exit code, no `pipefail` hazard — is a
+  *shell* problem. These are two separate `run:` steps with `needs`-like
+  ordering, not a pipeline, so this action never had it. **Record this before
+  simplifying**: collapsing the steps silently drops the deploy outputs.
+  Revisit if this action ever stops publishing them.
 - **No `via` knob** (law) and **no timeout inputs** (the CLI owns its budgets).
 
 ## Consumers
