@@ -23,7 +23,7 @@ Your site is live instantly on `*.shipstatic.com`. No token, no sign-up, no conf
 
 Deployments made without a token are public and expire — the `claim` output holds a URL that keeps the site permanently, and `expires` holds the deadline.
 
-Add `github-token: ${{ secrets.GITHUB_TOKEN }}` to post the URL as a PR comment and track deployments in the repo sidebar.
+Add `github-token: ${{ secrets.GITHUB_TOKEN }}` to post the URL as a comment on pull requests.
 
 ## All Features — Free API Key
 
@@ -41,7 +41,6 @@ on:
 
 permissions:
   contents: read
-  deployments: write
   pull-requests: write
 
 jobs:
@@ -86,24 +85,17 @@ A deploy-only workflow can run on a deploy token. This action never reads your a
 | `password` | No | — | Password-protect the deployment (6–128 characters). Visitors are prompted to unlock before viewing |
 | `labels` | No | — | Comma-separated labels, added to the automatic commit label |
 | `idempotency-key` | No | *derived* | Override the replay key (see below) |
-| `github-token` | No | — | GitHub token for PR comments and deployment tracking |
-| `environment` | No | *derived* | Environment name for the deployment record — `preview` on pull requests, `production` otherwise |
+| `github-token` | No | — | GitHub token for the PR comment |
 
-The `github-token` input enables two features:
-
-- **PR comments** — posts the deployment URL as a single comment, updated in place on every push
-- **GitHub Deployments** — creates deployment objects visible in the repo sidebar
-
-If your job already declares an [`environment:`](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment), GitHub records the deployment for you — omit `github-token` on pushes rather than creating a second record. `environment:` on this action names the environment for the record it creates, for workflows that have none of their own.
-
-Use the automatic `${{ secrets.GITHUB_TOKEN }}` — no extra secrets needed. Your workflow needs these permissions:
+`github-token` enables one thing: a **PR comment** carrying the deployment URL, posted once and updated in place on every push. Use the automatic `${{ secrets.GITHUB_TOKEN }}` — no extra secrets needed — and give your workflow the permission to write it:
 
 ```yaml
 permissions:
   contents: read
-  deployments: write
   pull-requests: write
 ```
+
+To record deployments in your repo's sidebar, declare an [`environment:`](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) on the job. GitHub writes that record itself, with the environment you named — this action does not write one.
 
 ## Outputs
 

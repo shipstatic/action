@@ -74,11 +74,11 @@ jobs:
       # and a bespoke extractor that silently found zero blocks would be a
       # green fence proving nothing. Deciding to add or remove a step means
       # updating this number, which is the moment to reread the shell.
-      - name: The action is four shell steps
+      - name: The action is three shell steps
         run: |
           STEPS=$(grep -c '^      shell: bash$' action.yml || true)
-          if [ "$STEPS" != "4" ]; then
-            echo "::error file=action.yml::expected 4 shell steps, found $STEPS — the step shape is part of the contract; update this fence deliberately"
+          if [ "$STEPS" != "3" ]; then
+            echo "::error file=action.yml::expected 3 shell steps, found $STEPS — the step shape is part of the contract; update this fence deliberately"
             exit 1
           fi
 

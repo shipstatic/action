@@ -7,8 +7,8 @@ Claude Code instructions for **`shipstatic/action`** — the GitHub Action.
 A **composite** action: `action.yml` plus docs, plus a fixture and a workflow
 that prove them. No build, no manifest, no runtime code. It installs the
 `@shipstatic/ship` CLI on the runner and invokes it **once** — a deploy that
-links a domain when one was asked for — and wraps that in two GitHub-side
-conveniences (a deployment record, a sticky PR comment).
+links a domain when one was asked for — and wraps that in one GitHub-side
+convenience, a sticky PR comment.
 
 **v2 speaks the 2.x platform.** The action's major and the platform major it
 targets are the same number from here on, which is the versioning law below.
@@ -133,8 +133,7 @@ Every absence below is a decision; see "Recorded absences".
 | `password` | — | → `SHIP_PASSWORD` (the empty-unset guard stays) |
 | `labels` | — | Comma-separated → repeated `--label`, appended after the automatic short SHA |
 | `idempotency-key` | *derived* | Override; else `<repo>-<run id>-<job id>` → `SHIP_IDEMPOTENCY_KEY` |
-| `github-token` | — | Enables the deployment record + the sticky PR comment |
-| `environment` | *derived* | The record's environment name; read ONLY by the record step, so it does nothing without `github-token` |
+| `github-token` | — | Enables the sticky PR comment, and nothing else |
 
 | Output | Source |
 |---|---|
@@ -307,6 +306,29 @@ One comment per PR, updated in place, found by a hidden marker
 it*, so on a PR where any other workflow also comments as
 `github-actions[bot]` the two clobber each other.
 
+It is what `github-token` buys, and since **v2.2.0** it is the only thing.
+
+### The deployment record was GitHub's job all along
+
+The action wrote a deployment record of its own from v1 until v2.2.0, and it is
+gone rather than fixed. A job that declares `environment:` already makes GitHub
+write that record — with the environment the consumer named, at the moment the
+job starts — so the step could only ever add a SECOND record for the same
+deploy. And the audience that declares no environment is the quickstart
+audience, which does not read the deployments sidebar.
+
+The `environment:` input went with it, four hours old. It existed because the
+step could not know the answer: the record guessed
+`pull_request ? preview : production`, which called every dev push
+`production` — true of the deploy, false of the record. Letting the consumer
+name the environment was the right fix to the wrong problem; the consumer's own
+`environment:` already names it one level up, where GitHub reads it.
+
+Both are a deletion rather than a deprecation because a released input is
+cheapest to remove while nobody has adopted it, and this one was hours old on a
+Marketplace listing that had been serving the previous major until the day
+before.
+
 ## The fence
 
 `.github/workflows/ci.yml`, tests-only on both branches:
@@ -423,8 +445,8 @@ Production is the only public value; the dev API URL arrives from the
 - **The `SHIP_PASSWORD` empty-unset guard** — defense in depth for whatever
   CLI the pin resolves, even though the 2.x CLI normalizes empty to absence
   itself.
-- **The fenced step shape** and `continue-on-error` on the two GitHub-side
-  conveniences: a failed comment must never fail a deploy that succeeded.
+- **The fenced step shape** and `continue-on-error` on the PR comment: a failed
+  comment must never fail a deploy that succeeded.
 - **Anonymous deploy as a first-class path** — the keyless quickstart is a
   product demo, not an accident.
 - **Output names within a major.** v1's `id`/`url`/`claim` are its published
@@ -483,22 +505,6 @@ creates once in the dashboard — so it is a **product decision, not an action
 wave**. Recorded here because of what it dissolves: the long-lived secret class
 entirely, and with it the key-rotation hygiene that follows every credential
 that has ever appeared in a log, a transcript or a screen share.
-
-The `environment:` input that used to sit in this section shipped in **v2.1.0**:
-the record step's `pull_request ? preview : production` guess called every dev
-push `production`, true of the deploy and false of the record. It is now the
-fallback, and a consumer that names its environment gets it recorded.
-
-**A consumer whose job declares `environment:` should not pass `github-token`
-on a push at all** — GitHub writes that job's deployment record itself, so the
-token buys a SECOND record for the same deploy. The input serves the consumer
-this action was designed for: the quickstart workflow with no environments,
-where the record step is the only thing writing one.
-
-Both GitHub-side conveniences (the record, the sticky comment) remain
-**unfenced by decision** — a bespoke harness for three rarely-changing shell
-lines is machinery the estate's idiom refuses — so the new input rides that same
-recorded call.
 
 ## Pointers
 

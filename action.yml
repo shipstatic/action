@@ -31,10 +31,7 @@ inputs:
     description: 'Override the derived idempotency key. Defaults to this workflow run + job, so re-running a job replays the original deployment instead of deploying twice. Set one per matrix leg when legs deploy different content.'
     required: false
   github-token:
-    description: 'GitHub token for PR comments and deployment tracking'
-    required: false
-  environment:
-    description: 'Environment name for the GitHub deployment record. Defaults to preview on pull requests and production otherwise. Only read when github-token is set.'
+    description: 'GitHub token for the PR comment.'
     required: false
 
 outputs:
@@ -174,9 +171,9 @@ runs:
         # `attest-build-provenance`), and it is inert: no opt-out knob, since
         # nothing downstream can depend on it.
         #
-        # It lives INSIDE this step rather than in a fifth one. Each step gets
+        # It lives INSIDE this step rather than in a fourth one. Each step gets
         # its own summary FILE and the job concatenates them, so a table split
-        # across two steps would not render as one table — and the four-step
+        # across two steps would not render as one table — and the three-step
         # shape is fenced, so a step is a design change rather than an edit.
         #
         # Every row is the wire's own again. `domain` used to need a row of its
@@ -204,34 +201,6 @@ runs:
             echo "| Expires | $EXPIRES_AT |"
           fi
         } >> "$GITHUB_STEP_SUMMARY"
-
-    - name: Create GitHub deployment
-      if: ${{ inputs.github-token != '' && steps.deploy.outputs.url != '' }}
-      continue-on-error: true
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.github-token }}
-        GH_REPO: ${{ github.repository }}
-        GH_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        GH_EVENT: ${{ github.event_name }}
-        DEPLOY_URL: ${{ steps.deploy.outputs.url }}
-        ENVIRONMENT: ${{ inputs.environment }}
-      run: |
-        # The consumer names the environment when it has one; the derivation is
-        # the fallback for the quickstart consumer that does not. The action
-        # has no notion of a non-production branch, so the guess called every
-        # dev push `production` — true of the deploy, false of the record.
-        # A workflow that declares `environment:` gets GitHub's own record and
-        # should not pass `github-token` at all; this input is for the rest.
-        if [ -z "$ENVIRONMENT" ]; then
-          ENVIRONMENT=$([[ "$GH_EVENT" == "pull_request" ]] && echo "preview" || echo "production")
-        fi
-        PAYLOAD=$(jq -n --arg ref "$GH_SHA" --arg env "$ENVIRONMENT" \
-          '{ref: $ref, environment: $env, auto_merge: false, required_contexts: []}')
-        ID=$(echo "$PAYLOAD" | gh api "repos/$GH_REPO/deployments" --input - --jq '.id')
-        gh api "repos/$GH_REPO/deployments/$ID/statuses" \
-          -f state=success \
-          -f environment_url="$DEPLOY_URL"
 
     - name: Comment on PR
       if: ${{ inputs.github-token != '' && steps.deploy.outputs.url != '' && github.event_name == 'pull_request' }}
