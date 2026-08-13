@@ -1,5 +1,5 @@
 name: 'ShipStatic'
-description: 'Deploy static websites, landing pages, and prototypes to ShipStatic from CI'
+description: 'Put your static site live on every push. Start free — no account needed.'
 branding:
   icon: 'upload-cloud'
   color: 'blue'

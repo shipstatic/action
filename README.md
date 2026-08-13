@@ -1,36 +1,52 @@
-# shipstatic/action
+# Your site, live on every push
 
-GitHub Action for [ShipStatic](https://shipstatic.com) — deploy static websites, landing pages, and prototypes instantly from CI.
+[ShipStatic](https://shipstatic.com) is the simplest way to put a static site online. This action deploys yours automatically every time you push — and you can try it before creating an account.
 
-## Deploy — Free, No Account Needed
+## Deploy in two minutes — no account needed
+
+1. In your repository, create a file called `.github/workflows/deploy.yml`.
+2. Paste this in:
+
+   ```yaml
+   name: Deploy
+   on: push
+
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v7
+         - uses: shipstatic/action@v2
+   ```
+
+3. Commit and push. That's the whole setup for a plain folder of files with an `index.html` at the top.
+
+If your site is built first — Vite, Next, Astro, anything with a build command — add the build line and point `path` at its output:
 
 ```yaml
-name: Deploy
-on: push
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - run: npm ci && npm run build
-      - uses: shipstatic/action@v2
-        with:
-          path: ./dist
+       steps:
+         - uses: actions/checkout@v7
+         - run: npm ci && npm run build
+         - uses: shipstatic/action@v2
+           with:
+             path: ./dist
 ```
 
-Your site is live instantly on `*.shipstatic.com`. No token, no sign-up, no configuration.
+Prefer to start from something complete? Five copy-paste workflows live in the [action-example](https://github.com/shipstatic/action-example) repo — see [Examples](#examples).
 
-Deployments made without a token are public and expire — the `claim` output holds a URL that keeps the site permanently, and `expires` holds the deadline.
+## Where's my site?
 
-On pull requests the action comments the URL automatically. Give the workflow `pull-requests: write` and there is nothing else to configure.
+Open the run in your repository's **Actions** tab. The run's summary shows your site's address — something like `happy-cat-abc1234.shipstatic.com` — live the moment the job goes green.
 
-## All Features — Free API Key
+A deploy made without a token is a test drive: it's public and it expires. The summary shows the exact expiry date, and a **claim link** — open it, and the site is yours permanently on a free account.
 
-For permanent deployments and full control over your sites and domains, get a free API key from [my.shipstatic.com/api-key](https://my.shipstatic.com/api-key):
+On pull requests the action also posts the address as a comment, updated in place on every push. Give the workflow `pull-requests: write` and there is nothing else to configure.
 
-1. Get a free key at [my.shipstatic.com/api-key](https://my.shipstatic.com/api-key)
-2. Add it as a repository secret named `SHIP_TOKEN` (Settings > Secrets and variables > Actions)
+## Keep your sites: add your API key
+
+1. Get your free API key at [my.shipstatic.com/api-key](https://my.shipstatic.com/api-key).
+2. In your repository: **Settings → Secrets and variables → Actions → New repository secret**. Name it `SHIP_TOKEN`, paste the key.
+3. Hand it to the action:
 
 ```yaml
 name: Deploy
@@ -53,6 +69,19 @@ jobs:
         with:
           token: ${{ secrets.SHIP_TOKEN }}
           path: ./dist
+```
+
+Deployments now land in your account and never expire.
+
+## Your own domain
+
+One more line puts the site at your address:
+
+```yaml
+      - uses: shipstatic/action@v2
+        with:
+          token: ${{ secrets.SHIP_TOKEN }}
+          path: ./dist
           domain: www.example.com
 ```
 
@@ -61,16 +90,32 @@ live at that address and the `url` output is your domain's URL. It needs a
 token — a domain belongs to an account — and without one the deploy is refused
 before anything is uploaded, rather than silently landing somewhere else.
 
-### One slot, two kinds of token
+## Preview every pull request — links that clean themselves up
 
-`token` takes either credential ShipStatic issues:
+`ttl` gives a deployment a lifetime in seconds. When it runs out the platform reclaims the deployment — no cleanup workflow, no `pull_request: closed` handler to maintain:
 
-| Value | What it is |
-|-------|------------|
-| `ship-…` | An **API key** — durable, full account access |
-| `deploy-…` | A **deploy token** — scoped to deploys, optionally time-limited, revocable |
+```yaml
+name: Preview
+on: pull_request
 
-A deploy-only workflow can run on a deploy token. This action never reads your account, so nothing here needs the wider credential — create one at [my.shipstatic.com](https://my.shipstatic.com) and keep the API key out of CI.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm ci && npm run build
+      - uses: shipstatic/action@v2
+        with:
+          token: ${{ secrets.SHIP_TOKEN }}
+          path: ./dist
+          ttl: 604800   # one week
+```
+
+Every push to the pull request updates the same comment with the fresh preview address. `ttl` needs a token — a deployment made without one already expires on the platform's own schedule — and it cannot be combined with `domain`: a domain should not point at something that is about to be reclaimed. The `expires` output carries the deadline as a unix timestamp.
 
 ## Inputs
 
@@ -97,6 +142,17 @@ permissions:
 Pass `github-token: ''` if you would rather the action never commented. Pass a different token to comment on a PR in another repository.
 
 To record deployments in your repo's sidebar, declare an [`environment:`](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) on the job. GitHub writes that record itself, with the environment you named — this action does not write one.
+
+### Two kinds of token
+
+`token` takes either credential ShipStatic issues:
+
+| Value | What it is |
+|-------|------------|
+| `ship-…` | An **API key** — durable, full account access |
+| `deploy-…` | A **deploy token** — scoped to deploys, optionally time-limited, revocable |
+
+A deploy-only workflow can run on a deploy token. This action never reads your account, so nothing here needs the wider credential — create one at [my.shipstatic.com](https://my.shipstatic.com) and keep the API key out of CI.
 
 ## Outputs
 
@@ -130,33 +186,6 @@ Every deployment is labelled with the commit's short SHA automatically. `labels`
 ```
 
 Labels are 3–25 characters, lowercase alphanumeric with `.`, `_` or `-` between segments, up to 10 per deployment. Find them again with `ship deployments list`.
-
-## Previews that clean themselves up
-
-`ttl` gives a deployment a lifetime in seconds. When it runs out the platform reclaims the deployment — no cleanup workflow, no `pull_request: closed` handler to maintain:
-
-```yaml
-name: Preview
-on: pull_request
-
-permissions:
-  contents: read
-  pull-requests: write
-
-jobs:
-  preview:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - run: npm ci && npm run build
-      - uses: shipstatic/action@v2
-        with:
-          token: ${{ secrets.SHIP_TOKEN }}
-          path: ./dist
-          ttl: 604800   # one week
-```
-
-`ttl` needs a token — a deployment made without one already expires on the platform's own schedule — and it cannot be combined with `domain`: a domain should not point at something that is about to be reclaimed. The `expires` output carries the deadline as a unix timestamp.
 
 ## Re-running a job does not deploy twice
 
