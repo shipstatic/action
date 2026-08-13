@@ -367,10 +367,14 @@ Five things about it are deliberate:
   same in any account — so when this leg's credential was swapped for a human's
   on 2026-08-12 it stayed green for hours while filling a personal account, and
   only a hand audit of deployment labels found it. **Neither the expected nor
-  the observed value is ever echoed**: the expected one lives in the
-  environment because a `.dev` address in a tracked file fails the public-value
-  fence, and printing the observed one would publish, in a public log, exactly
-  the identity the check exists to protect.
+  the observed value is ever echoed**, and that is why the expected one is a
+  SECRET rather than a variable. It cannot be a tracked literal — a `.dev`
+  address fails the public-value fence — and a `vars.` value does not survive
+  the trip either: **the runner echoes a step's whole `env:` block into the log
+  before the step runs**, unmasked, so a variable publishes itself whatever the
+  shell then does. Secrets are masked to `***` at that same boundary. Found by
+  drilling it: the first cut used a variable, and the deliberately-wrong drill
+  run printed the value it was hiding.
 - **The authed leg's other assertion is the INVERSE of the anonymous one.** "The
   deploy succeeded" proves nothing here: fail-closed anonymity means a
   credential the CLI does not read still produces a clean 201. Only *no claim,
@@ -407,11 +411,13 @@ says what happened, and a maintainer re-runs the change from a branch.
 
 **USER setup, once:** a `development` GitHub Environment on
 `shipstatic/action` carrying a `SHIP_API_URL` variable (the dev API), a
-`CI_ACCOUNT_EMAIL` variable (the account that secret belongs to), and,
-optionally, a `SHIP_TOKEN` secret. Without the secret the authed leg skips
-with a `::notice`; without either variable the jobs fail loudly by design.
-**Re-minting the CI key means re-setting the secret** — `PUT /account/key` is
-an upsert, so a fresh key in the dashboard revokes the one CI holds.
+`CI_ACCOUNT_EMAIL` **secret** (the account `SHIP_TOKEN` belongs to — a secret
+rather than a variable for the masking reason above) and, optionally, the
+`SHIP_TOKEN` secret itself. Without `SHIP_TOKEN` the authed leg skips with a
+`::notice`; without `SHIP_API_URL` or `CI_ACCOUNT_EMAIL` the jobs fail loudly
+by design. **Re-minting the CI key means re-setting the secret in the same
+motion** — `PUT /account/key` is an upsert, so a fresh key in the dashboard
+revokes the one CI is holding.
 **Add no protection rules** — required reviewers or a wait timer would block
 every push and every PR, since this environment gates CI rather than a
 release.

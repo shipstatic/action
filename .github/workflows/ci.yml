@@ -243,19 +243,22 @@ jobs:
       # swapped for a human's the fence stayed green for hours and quietly
       # filled a personal account (2026-08-12).
       #
-      # NEITHER side is ever printed. The expected value lives in the
-      # environment because a `.dev` address in a tracked file fails the
-      # estate's public-hygiene fence, and the observed one stays inside the
-      # comparison — a fence that publishes the identity it guards has paid for
-      # a message nobody reads on a green run.
+      # NEITHER side is ever printed, and that is why the expected value is a
+      # SECRET rather than a variable. It cannot be a tracked literal (a `.dev`
+      # address fails the estate's public-hygiene fence), and a `vars.` value
+      # does not survive the trip either: the runner echoes every step's `env:`
+      # block into the log BEFORE the step runs, unmasked, so a variable
+      # publishes itself no matter what the shell below does. A secret is
+      # masked to `***` at that same boundary. The observed value never leaves
+      # the comparison.
       - name: The deploy landed in the intended account
         if: env.SHIP_TOKEN != ''
         env:
           SHIP_API_URL: ${{ vars.SHIP_API_URL }}
-          EXPECTED: ${{ vars.CI_ACCOUNT_EMAIL }}
+          EXPECTED: ${{ secrets.CI_ACCOUNT_EMAIL }}
         run: |
           if [ -z "$EXPECTED" ]; then
-            echo "::error::the development GitHub Environment has no CI_ACCOUNT_EMAIL variable — this leg cannot tell which account it deploys into"
+            echo "::error::the development GitHub Environment has no CI_ACCOUNT_EMAIL secret — this leg cannot tell which account it deploys into"
             exit 1
           fi
           if [ "$(ship whoami --json --no-color | jq -r '.email')" != "$EXPECTED" ]; then
