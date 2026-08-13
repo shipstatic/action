@@ -237,6 +237,33 @@ jobs:
           path: fixture
           labels: ci-fence
 
+      # WHOSE account, asserted — the one question every other check here
+      # cannot ask. An owned, labelled, git-attributed deployment looks
+      # identical whichever account holds it, so when this leg's credential was
+      # swapped for a human's the fence stayed green for hours and quietly
+      # filled a personal account (2026-08-12).
+      #
+      # NEITHER side is ever printed. The expected value lives in the
+      # environment because a `.dev` address in a tracked file fails the
+      # estate's public-hygiene fence, and the observed one stays inside the
+      # comparison — a fence that publishes the identity it guards has paid for
+      # a message nobody reads on a green run.
+      - name: The deploy landed in the intended account
+        if: env.SHIP_TOKEN != ''
+        env:
+          SHIP_API_URL: ${{ vars.SHIP_API_URL }}
+          EXPECTED: ${{ vars.CI_ACCOUNT_EMAIL }}
+        run: |
+          if [ -z "$EXPECTED" ]; then
+            echo "::error::the development GitHub Environment has no CI_ACCOUNT_EMAIL variable — this leg cannot tell which account it deploys into"
+            exit 1
+          fi
+          if [ "$(ship whoami --json --no-color | jq -r '.email')" != "$EXPECTED" ]; then
+            echo "::error::the authed leg is not running as the intended account"
+            exit 1
+          fi
+          echo "identity confirmed"
+
       # "The deploy succeeded" proves NOTHING on its own here: ship is
       # fail-closed anonymous, so a credential the CLI does not read produces a
       # perfectly successful PUBLIC deploy. The proof is the inverse of the

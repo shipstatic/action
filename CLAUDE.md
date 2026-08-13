@@ -361,7 +361,17 @@ Five things about it are deliberate:
   already determines. The domain is self-maintaining — the first run creates it
   under the CI account, every later run repoints it, no setup and no cleanup —
   and `links` in the read-back row is that property made visible.
-- **The authed leg's assertion is the INVERSE of the anonymous one.** "The
+- **The authed leg asserts WHOSE account it deployed into**, against
+  `CI_ACCOUNT_EMAIL` in the environment. Every other check describes what the
+  deployment looks like, and an owned, labelled, git-attributed row looks the
+  same in any account — so when this leg's credential was swapped for a human's
+  on 2026-08-12 it stayed green for hours while filling a personal account, and
+  only a hand audit of deployment labels found it. **Neither the expected nor
+  the observed value is ever echoed**: the expected one lives in the
+  environment because a `.dev` address in a tracked file fails the public-value
+  fence, and printing the observed one would publish, in a public log, exactly
+  the identity the check exists to protect.
+- **The authed leg's other assertion is the INVERSE of the anonymous one.** "The
   deploy succeeded" proves nothing here: fail-closed anonymity means a
   credential the CLI does not read still produces a clean 201. Only *no claim,
   no expiry* proves the token was read.
@@ -396,9 +406,12 @@ misconfigured repo. A red e2e on a community PR would be a lie; a skipped job
 says what happened, and a maintainer re-runs the change from a branch.
 
 **USER setup, once:** a `development` GitHub Environment on
-`shipstatic/action` carrying a `SHIP_API_URL` variable (the dev API) and,
+`shipstatic/action` carrying a `SHIP_API_URL` variable (the dev API), a
+`CI_ACCOUNT_EMAIL` variable (the account that secret belongs to), and,
 optionally, a `SHIP_TOKEN` secret. Without the secret the authed leg skips
-with a `::notice`; without the variable both e2e jobs fail loudly by design.
+with a `::notice`; without either variable the jobs fail loudly by design.
+**Re-minting the CI key means re-setting the secret** — `PUT /account/key` is
+an upsert, so a fresh key in the dashboard revokes the one CI holds.
 **Add no protection rules** — required reviewers or a wait timer would block
 every push and every PR, since this environment gates CI rather than a
 release.
