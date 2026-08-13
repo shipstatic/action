@@ -67,7 +67,7 @@ jobs:
       - run: npm ci && npm run build
       - uses: shipstatic/action@v2
         with:
-          token: ${{ secrets.SHIP_TOKEN }}
+          token: ${{ secrets.SHIP_TOKEN }}   # your API key, via the secret
           path: ./dist
 ```
 
