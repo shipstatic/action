@@ -1,8 +1,8 @@
 name: 'ShipStatic'
-description: 'Put your static site live on every push. Start free — no account needed.'
+description: 'Deploy static websites, landing pages, and prototypes instantly, on every push. Free, no account needed.'
 branding:
   icon: 'upload-cloud'
-  color: 'blue'
+  color: 'orange'
 
 inputs:
   token:

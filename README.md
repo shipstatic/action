@@ -1,6 +1,6 @@
 # Your site, live on every push
 
-[ShipStatic](https://shipstatic.com) is the simplest way to put a static site online. This action deploys yours automatically every time you push — and you can try it before creating an account.
+Deploy static websites, landing pages, and prototypes instantly from [ShipStatic](https://shipstatic.com), on every push. Free, no account needed.
 
 ## Deploy in two minutes — no account needed
 
@@ -253,6 +253,17 @@ Five copy-pasteable workflows in the [action-example](https://github.com/shipsta
 - [`deploy-domain.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy-domain.yml) — permanent deploy with a custom domain
 - [`preview-pr.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/preview-pr.yml) — preview deploy on pull request
 - [`deploy-password.yml`](https://github.com/shipstatic/action-example/blob/main/.github/workflows/deploy-password.yml) — password-protected deploy (any tier)
+
+## Also available
+
+| Surface | Reach it |
+|---------|----------|
+| **[MCP](https://mcp.shipstatic.com)** | Drop `https://mcp.shipstatic.com` into any MCP client |
+| **[CLI and SDK](https://github.com/shipstatic/ship)** | `npx @shipstatic/ship ./dist` |
+| **[VS Code](https://marketplace.visualstudio.com/items?itemName=shipstatic.shipstatic)** | Search "ShipStatic" in the Marketplace |
+| **[Gemini CLI](https://github.com/shipstatic/plugin)** | `gemini extensions install https://github.com/shipstatic/plugin` |
+| **[n8n](https://www.npmjs.com/package/n8n-nodes-shipstatic)** | Search "ShipStatic" in n8n's node panel |
+| **[Agent Skill](https://www.shipstatic.com/SKILL.md)** | One file, for any skills-aware tool |
 
 ## License
 
