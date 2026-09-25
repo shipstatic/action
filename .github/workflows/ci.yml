@@ -346,21 +346,21 @@ jobs:
           fi
           echo "$URL serves $DEPLOYMENT"
 
-  # The family CI shape: failures notify Slack where the webhook secret is
-  # set. One terminal job rather than a step in each — three jobs would mean
-  # three copies of the same guard. Job-level `env` so the `if:` can read it.
+  # A red run on a push or a schedule reaches the operator's alerts channel; a
+  # pull request's red already has a reader, its author. The webhook lives in
+  # this job alone, which runs nothing but curl, and an unset secret fails the
+  # job rather than skipping it. Root CLAUDE.md, "CI notifications".
   notify:
     needs: [lint, e2e-anonymous, e2e-authenticated]
-    if: failure()
+    if: failure() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    env:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    permissions: {}
     steps:
-      - if: env.SLACK_WEBHOOK_URL != ''
-        uses: slackapi/slack-github-action@v4
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "🔴 action CI failed on ${{ github.ref_name }}"
+      - name: Post to the alerts channel
+        env:
+          ALERTS_WEBHOOK: ${{ secrets.ALERTS_WEBHOOK }}
+        run: |
+          MESSAGE="🔴 action CI failed on $GITHUB_REF_NAME"
+          [ -n "$ALERTS_WEBHOOK" ] || { echo "::error::ALERTS_WEBHOOK is not set on this repository, so this outcome reached nobody"; exit 1; }
+          curl --fail-with-body -sS --form-string "content=$MESSAGE <$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID>" "$ALERTS_WEBHOOK"

@@ -443,7 +443,7 @@ rather than faked:
 | This file, `AGENTS.md` | Biome — nothing here it parses |
 | Pre-commit credential scan (`scripts/githooks/pre-commit`) | `packageManager` / Node pin — no manifest |
 | actionlint in CI | Coverage — no runtime to measure |
-| A tests-only `ci.yml` on both branches, Slack failure notify (guarded on the webhook secret, the family shape) | |
+| A tests-only `ci.yml` on both branches, a failure notice to the operator's alerts channel (root `CLAUDE.md`, "CI notifications") | |
 | `renovate.json` (org preset — `ci.yml`'s pinned actions, actionlint included, are exactly what it updates elsewhere) | |
 
 The hook has no `prepare` script to install it. Run once per clone:
