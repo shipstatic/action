@@ -142,8 +142,8 @@ Every absence below is a decision; see "Recorded absences".
 | `claim` | `jq -r '.claim // empty'` |
 | `expires` | `jq -r '.expires // empty'` — unix seconds; feeds the comment's date. Anonymous deploys AND `ttl` deploys carry one |
 
-Automatic, no knob: `SHIP_VIA=git` · the commit short-SHA label · the derived
-idempotency key · the run summary · SPA detection and junk filtering (the CLI's
+Automatic, no knob: `SHIP_VIA=git` • the commit short-SHA label • the derived
+idempotency key • the run summary • SPA detection and junk filtering (the CLI's
 defaults; `ship.json` is the override).
 
 ### One invocation, one exit code, one JSON
