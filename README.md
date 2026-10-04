@@ -240,7 +240,7 @@ GitHub-hosted runners need nothing. Self-hosted runners need **Node.js 20 or new
 ## Things this action deliberately does not have
 
 - **No `cli-version` input.** The action's major names the CLI major it speaks; letting a workflow float across that boundary is the failure this design exists to prevent.
-- **No SPA / path-detection toggles.** The CLI's defaults are right, and a repo that needs different behaviour ships a [`ship.json`](https://docs.shipstatic.com), which the detection defers to.
+- **No path-detection toggle.** The CLI's default is right, and a repo that needs different behaviour ships a [`ship.json`](https://docs.shipstatic.com).
 - **No `setup-node` step.** Hosted runners already carry a supported Node; installing another would slow every workflow for the exception's sake.
 - **No timeout inputs.** The CLI owns its own budgets, sized to the platform's upload limits.
 

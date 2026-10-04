@@ -143,8 +143,8 @@ Every absence below is a decision; see "Recorded absences".
 | `expires` | `jq -r '.expires // empty'` — unix seconds; feeds the comment's date. Anonymous deploys AND `ttl` deploys carry one |
 
 Automatic, no knob: `SHIP_VIA=git` • the commit short-SHA label • the derived
-idempotency key • the run summary • SPA detection and junk filtering (the CLI's
-defaults; `ship.json` is the override).
+idempotency key • the run summary • junk filtering (the CLI's default;
+`ship.json` is the override).
 
 ### One invocation, one exit code, one JSON
 
@@ -487,10 +487,9 @@ Production is the only public value; the dev API URL arrives from the
 
 - **No `cli-version` input.** Majors-pin-majors IS the contract; an override
   would let a consumer float, which is the failure above wearing a knob.
-- **No `spa-detect` / `path-detect` toggles.** The SDK's defaults are right,
-  and a repo needing different behaviour ships a `ship.json`, which the
-  detection already defers to. A toggle would be a second way to say what the
-  config file owns.
+- **No `path-detect` toggle.** The SDK's default is right, and a repo needing
+  different behaviour ships a `ship.json`. A toggle would be a second way to
+  say what the config file owns.
 - **No `setup-node` step.** Hosted runners carry Node ≥20; the README states
   the requirement for self-hosted ones. Installing our own would slow every
   consumer for the exception's benefit.
