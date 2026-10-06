@@ -58,11 +58,11 @@ jobs:
         run: |
           PIN=$(grep -oE '@shipstatic/ship@[0-9][0-9A-Za-z.-]*' action.yml | head -1 | cut -d@ -f3 || true)
           if [ -z "$PIN" ]; then
-            echo "::error file=action.yml::the install line does not pin a ship version. v2 speaks ship 2.x; a floating install is the failure this action's versioning exists to prevent"
+            echo "::error file=action.yml::the install line does not pin a ship version. v3 speaks ship 3.x; a floating install is the failure this action's versioning exists to prevent"
             exit 1
           fi
-          if [ "${PIN%%.*}" != "2" ]; then
-            echo "::error file=action.yml::this is the v2 action but it installs ship $PIN — majors pin majors"
+          if [ "${PIN%%.*}" != "3" ]; then
+            echo "::error file=action.yml::this is the v3 action but it installs ship $PIN — majors pin majors"
             exit 1
           fi
           echo "action.yml pins ship $PIN"

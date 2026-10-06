@@ -53,7 +53,7 @@ runs:
   using: 'composite'
   steps:
     # MAJORS PIN MAJORS. An action whose interface is a contract with a CLI must
-    # name the CLI major it speaks: `@v2` speaks ship 2.x, and this line says so
+    # name the CLI major it speaks: `@v3` speaks ship 3.x, and this line says so
     # in bytes. `@latest` here would put whatever the registry serves this minute
     # inside every consumer's workflow — and the 2.x CLI does not read the 1.x
     # credential variable, so a float across that boundary turns an authenticated
@@ -65,7 +65,7 @@ runs:
     # inside every deploy in every consumer's log.
     - name: Install ShipStatic CLI
       shell: bash
-      run: npm install -g @shipstatic/ship@2 --no-fund --no-audit --loglevel=error
+      run: npm install -g @shipstatic/ship@3 --no-fund --no-audit --loglevel=error
 
     - name: Deploy
       id: deploy

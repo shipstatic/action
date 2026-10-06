@@ -16,7 +16,7 @@ Deploy static websites, landing pages, and prototypes instantly from [ShipStatic
        runs-on: ubuntu-latest
        steps:
          - uses: actions/checkout@v7
-         - uses: shipstatic/action@v2
+         - uses: shipstatic/action@v3
    ```
 
 3. Commit and push. That's the whole setup for a plain folder of files with an `index.html` at the top.
@@ -27,7 +27,7 @@ If your site is built first — Vite, Next, Astro, anything with a build command
        steps:
          - uses: actions/checkout@v7
          - run: npm ci && npm run build
-         - uses: shipstatic/action@v2
+         - uses: shipstatic/action@v3
            with:
              path: ./dist
 ```
@@ -65,7 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: npm ci && npm run build
-      - uses: shipstatic/action@v2
+      - uses: shipstatic/action@v3
         with:
           token: ${{ secrets.SHIP_TOKEN }}   # your API key, via the secret
           path: ./dist
@@ -78,7 +78,7 @@ Deployments now land in your account and never expire.
 One more line puts the site at your address:
 
 ```yaml
-      - uses: shipstatic/action@v2
+      - uses: shipstatic/action@v3
         with:
           token: ${{ secrets.SHIP_TOKEN }}
           path: ./dist
@@ -108,7 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: npm ci && npm run build
-      - uses: shipstatic/action@v2
+      - uses: shipstatic/action@v3
         with:
           token: ${{ secrets.SHIP_TOKEN }}
           path: ./dist
@@ -164,7 +164,7 @@ A deploy-only workflow can run on a deploy token. This action never reads your a
 | `expires` | Expiry as a unix timestamp in seconds — set for anonymous deployments and for any deployment given a `ttl` |
 
 ```yaml
-      - uses: shipstatic/action@v2
+      - uses: shipstatic/action@v3
         id: deploy
         with:
           path: ./dist
@@ -178,7 +178,7 @@ Every deploy also writes a summary table to the workflow run page — the deploy
 Every deployment is labelled with the commit's short SHA automatically. `labels` adds your own on top:
 
 ```yaml
-      - uses: shipstatic/action@v2
+      - uses: shipstatic/action@v3
         with:
           token: ${{ secrets.SHIP_TOKEN }}
           path: ./dist
@@ -209,7 +209,7 @@ Give each its own key:
       matrix:
         site: [docs, marketing]
     steps:
-      - uses: shipstatic/action@v2
+      - uses: shipstatic/action@v3
         with:
           path: ./dist/${{ matrix.site }}
           idempotency-key: ${{ github.run_id }}-${{ matrix.site }}
@@ -220,7 +220,7 @@ Give each its own key:
 `api-url` points the action at another ShipStatic API. Omit it and the production API is used.
 
 ```yaml
-      - uses: shipstatic/action@v2
+      - uses: shipstatic/action@v3
         with:
           token: ${{ secrets.SHIP_TOKEN }}
           api-url: ${{ vars.SHIP_API_URL }}
@@ -233,9 +233,9 @@ GitHub-hosted runners need nothing. Self-hosted runners need **Node.js 20 or new
 
 ## Versioning
 
-`@v2` is a moving tag that always points at the latest 2.x release, and it speaks the ShipStatic **2.x** platform — the action's major and the platform major it targets are the same number, by design. Pin an exact `@vX.Y.Z` tag for an immutable reference, or `@<full-sha>` if your supply-chain policy requires actions pinned by commit.
+`@v3` is a moving tag that always points at the latest 3.x release, and it speaks the ShipStatic **3.x** platform — the action's major and the platform major it targets are the same number, by design. Pin an exact `@vX.Y.Z` tag for an immutable reference, or `@<full-sha>` if your supply-chain policy requires actions pinned by commit.
 
-`@v1` is frozen and speaks the 1.x platform. It receives no changes.
+`@v2` is frozen and speaks the 2.x platform; `@v1` is frozen and speaks the 1.x platform. Neither receives changes.
 
 ## Things this action deliberately does not have
 

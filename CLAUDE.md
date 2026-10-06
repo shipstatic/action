@@ -10,13 +10,13 @@ that prove them. No build, no manifest, no runtime code. It installs the
 links a domain when one was asked for — and wraps that in one GitHub-side
 convenience, a sticky PR comment.
 
-**v2 speaks the 2.x platform.** The action's major and the platform major it
+**v3 speaks the 3.x platform.** The action's major and the platform major it
 targets are the same number from here on, which is the versioning law below.
 
 ## The law: majors pin majors
 
 An action whose interface is a CONTRACT WITH A CLI must name the CLI major it
-speaks. `@v1` speaks ship 1.x; `@v2` speaks ship 2.x; the install line says so
+speaks. `@v1` speaks ship 1.x; `@v2` speaks ship 2.x; `@v3` speaks ship 3.x; the install line says so
 in bytes.
 
 This is not tidiness. The action is the ONE consumer on the platform that
@@ -31,14 +31,14 @@ anywhere. A consumer that also links a domain fails one step later; a consumer
 that does not gets no signal at all.
 
 `.github/workflows/ci.yml` holds the law mechanically: the install line must
-name a ship major, and that major must be `2`.
+name a ship major, and that major must be `3`.
 
 ### The pin
 
-The install line reads `@shipstatic/ship@2` and freezes there for the life of
+The install line reads `@shipstatic/ship@3` and freezes there for the life of
 this major — **and that line is this repo's constellation pin**, since it has
 no manifest. A range is the right shape precisely because it is a major: every
-2.x fix reaches every `@v2` consumer with no release here, which is the whole
+3.x fix reaches every `@v3` consumer with no release here, which is the whole
 argument for staying composite.
 
 The fence checks the MAJOR rather than the literal, which is what let the line
@@ -119,7 +119,20 @@ than overlooked: keyless `@v1` consumers stay broken against the 2.x API until
 they move to v2 — the platform's recorded pre-launch posture, chosen over
 teaching v1 the 2.x wire.
 
-## The v2 surface
+### v2 is frozen the same way
+
+`v2` points at `v2.2.1` (`ab03170`), whose install line reads `@shipstatic/ship@2`,
+and `@2` resolves 2.9.6, the last 2.x the registry holds; ship has no 2.x
+maintenance line, so that is the CLI every `@v2` consumer runs for as long as it
+stays on v2. It kept working across ship 3.0 to 3.4 because the four shell steps
+read fields (`deployment`, `url`, `claim`, `expires`) that both majors answer
+alike, which is why v3 was cut as a catch-up rather than a repair. v3.0.0 moves
+the install line to `@shipstatic/ship@3` and changes nothing else in the steps;
+what a consumer gains by moving is the 3.x CLI itself (the empty-shell SPA rule
+with its loud `/spa-check` failure, the cancel signal, limits read per deploy,
+the API's way forward in a refusal). `v2` receives no changes, like `v1`.
+
+## The v3 surface
 
 Every absence below is a decision; see "Recorded absences".
 
@@ -346,7 +359,7 @@ before.
 
 | Job | What it holds |
 |---|---|
-| `lint` | actionlint over `.github/workflows/**`; the install line names ship major 2; the action is four shell steps |
+| `lint` | actionlint over `.github/workflows/**`; the install line names ship major 3; the action is four shell steps |
 | `e2e-anonymous` | Deploys `fixture/` keyless to dev; asserts all four outputs, that `url` addresses `deployment`, that claim + expires are both present, that the URL serves 200 — and that a SECOND same-job invocation REPLAYS the first deployment rather than creating one (the derived key's documented same-job collapse, used as the fence for the silent class: an unread `SHIP_IDEMPOTENCY_KEY` would keep succeeding and simply duplicate) |
 | `e2e-authenticated` | Deploys with a token AND a domain; asserts the deployment is **not** claimable or expiring, reads `via` and both labels back from the API, and proves the collapsed path — `url` is the domain's, that URL serves 200, and the domain points at this run's deployment |
 
@@ -462,7 +475,7 @@ Production is the only public value; the dev API URL arrives from the
   asserted. Bundling the SDK (the vscode extension's pattern) would freeze the
   platform client per action release, so every CLI fix would need a release
   here to reach consumers. Install-then-invoke under majors-pin-majors delivers
-  every 2.x fix to every `@v2` consumer with zero releases, and **tracking the
+  every 3.x fix to every `@v3` consumer with zero releases, and **tracking the
   platform is this product's whole job** — the extension bundles because an
   editor owns its release train; this action's train IS the platform's. A
   bundled action would also be a third full-platform-bar surface (suite,
@@ -509,16 +522,16 @@ Production is the only public value; the dev API URL arrives from the
 
 ## Consumers
 
-`integrations/action-example` — five workflows, all on `@v2` since
-2026-08-11 and all green against production, including
+`integrations/action-example` — five workflows, all on `@v3` since
+2026-10-06 (on `@v2` from 2026-08-11) and all green against production, including
 `deploy-no-account.yml`, whose keyless path only works against a 2.x API. Its
 domain is owned by a dedicated `ci@shipstatic.com` account: it previously
 belonged to `public@shipstatic.com`, and since the public identity can hold no
 API key, **no credential could have linked it** — a domain is linkable only by
 the account that owns it.
 
-`web/my`, `web/www` and `web/docs` all ship themselves through `@v2` since
-2026-08-11 — a push to `development` deploys the dev site, and **the merge to
+`web/my`, `web/www` and `web/docs` all ship themselves through `@v3` since
+2026-10-06 (through `@v2` from 2026-08-11) — a push to `development` deploys the dev site, and **the merge to
 `main` IS the production deploy**, which is why every such merge is
 operator-timed. Their domains belong to the dedicated `sites@shipstatic.{dev,com}`
 accounts, since a domain is linkable only by its owner.
