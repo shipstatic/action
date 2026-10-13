@@ -182,10 +182,10 @@ Every deployment is labelled with the commit's short SHA automatically. `labels`
         with:
           token: ${{ secrets.SHIP_TOKEN }}
           path: ./dist
-          labels: preview,pr-${{ github.event.number }}
+          labels: env:preview,pr-${{ github.event.number }}
 ```
 
-Labels are 3–25 characters, lowercase alphanumeric with `.`, `_` or `-` between segments, up to 10 per deployment. Find them again with `ship deployments list`.
+A label is a word like `preview`, or a key and a value split by one `:` like `env:preview`. Find them again with `ship deployments list`.
 
 ## Re-running a job does not deploy twice
 
