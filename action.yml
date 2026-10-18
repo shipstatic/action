@@ -91,9 +91,9 @@ runs:
         # original 201 instead of deploying twice; the job is part of the key
         # because two jobs in one run may deploy two different sites, and the
         # repository is part of it because GitHub only guarantees a run id
-        # unique WITHIN a repository — anonymous deploys share a replay
-        # namespace keyed by the runner's egress IP, which every repository on
-        # a hosted runner shares.
+        # unique WITHIN a repository, and a key replays within an account,
+        # which many repositories can share. An anonymous deploy's key is
+        # ignored, so each of its runs is a new deployment.
         if [ -z "$IDEMPOTENCY_KEY" ]; then
           IDEMPOTENCY_KEY="${GITHUB_REPOSITORY}-${GITHUB_RUN_ID}-${GITHUB_JOB}"
         fi

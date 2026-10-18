@@ -195,7 +195,9 @@ Every deploy carries an idempotency key derived from the workflow run:
 <owner>/<repo>-<run id>-<job id>
 ```
 
-A GitHub run id is stable across re-runs and fresh on every new push, so pressing **Re-run jobs** replays the deployment the first attempt created — same URL, no second upload, no second deployment in your account — while the next push deploys normally. Nothing to configure.
+A GitHub run id is stable across re-runs and fresh on every new push, so pressing **Re-run jobs** replays the deployment the first attempt created in your account: same URL, no second upload, no second deployment. The next push deploys normally. Nothing to configure.
+
+The replay needs a `token`, because a key replays only within the account that sent it. Without one, each run is a new deployment.
 
 Two cases need an explicit key, because no ambient value distinguishes them:
 

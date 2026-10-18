@@ -153,29 +153,27 @@ jobs:
             --retry-all-errors --output /dev/null "$URL"
           echo "$URL serves"
 
-      # The replay property, proven through the DERIVED key's own mechanics: a
-      # second invocation in the same job carries the same repo-run-job key —
-      # the documented same-job collapse — so the API must answer with the
-      # SAME deployment, not a second one. This is the fence for a silent
-      # class: if SHIP_IDEMPOTENCY_KEY ever stopped being read end-to-end,
-      # deploys would keep succeeding and simply duplicate, and nothing else
-      # here would notice.
+      # An anonymous key is ignored: strangers share the public account, so a
+      # replay there could hand one of them another's site. A second
+      # invocation in the same job carries the same derived key and must
+      # still be a second deployment. The replay itself is proven in the
+      # authenticated leg, where a key names a deployment.
       - uses: ./
-        id: replay
+        id: again
         with:
           api-url: ${{ vars.SHIP_API_URL }}
           path: fixture
 
-      - name: The second invocation replays, not redeploys
+      - name: The second invocation deploys again, not replays
         env:
           FIRST: ${{ steps.deploy.outputs.deployment }}
-          SECOND: ${{ steps.replay.outputs.deployment }}
+          SECOND: ${{ steps.again.outputs.deployment }}
         run: |
-          if [ "$SECOND" != "$FIRST" ]; then
-            echo "::error::the replay deployed fresh — same job, same derived key, but got '$SECOND' after '$FIRST'. SHIP_IDEMPOTENCY_KEY is not reaching the API"
+          if [ "$SECOND" = "$FIRST" ]; then
+            echo "::error::an anonymous deploy replayed '$FIRST'. The API must ignore a key without an account of its own"
             exit 1
           fi
-          echo "replayed $FIRST"
+          echo "deployed $FIRST, then $SECOND"
 
   # The authenticated half — and the leg that proves the credential input
   # reaches a variable the CLI actually reads.
@@ -345,6 +343,35 @@ jobs:
             exit 1
           fi
           echo "$URL serves $DEPLOYMENT"
+
+      # The replay property, proven through the DERIVED key's own mechanics: a
+      # second invocation in the same job carries the same repo-run-job key
+      # (the documented same-job collapse), so the API must answer with the
+      # SAME deployment within this account, not a second one. This is the
+      # fence for a silent class: if SHIP_IDEMPOTENCY_KEY ever stopped being
+      # read end to end, deploys would keep succeeding and simply duplicate,
+      # and nothing else here would notice.
+      - uses: ./
+        id: replay
+        if: env.SHIP_TOKEN != ''
+        with:
+          token: ${{ secrets.SHIP_TOKEN }}
+          api-url: ${{ vars.SHIP_API_URL }}
+          domain: ${{ steps.env.outputs.domain }}
+          path: fixture
+          labels: ci-fence
+
+      - name: The second invocation replays, not redeploys
+        if: env.SHIP_TOKEN != ''
+        env:
+          FIRST: ${{ steps.deploy.outputs.deployment }}
+          SECOND: ${{ steps.replay.outputs.deployment }}
+        run: |
+          if [ "$SECOND" != "$FIRST" ]; then
+            echo "::error::the replay deployed fresh: same job, same derived key, but got '$SECOND' after '$FIRST'. SHIP_IDEMPOTENCY_KEY is not reaching the API"
+            exit 1
+          fi
+          echo "replayed $FIRST"
 
   # A red run on a push or a schedule reaches the operator's alerts channel; a
   # pull request's red already has a reader, its author. The webhook lives in

@@ -296,11 +296,14 @@ push deploys normally. Each segment is load-bearing:
 
 - **job** — two jobs in one run may deploy two different sites; one key would
   replay the first site's 201 into the second job.
-- **repository** — GitHub guarantees a run id unique *within a repository*
-  only, and the API's replay namespace for an ANONYMOUS deploy is keyed by the
-  caller's egress IP, which every repository on a hosted runner shares. Without
-  this segment two repositories could collide, and the collision would hand
-  one of them the other's deployment URL.
+- **repository**: GitHub guarantees a run id unique *within a repository*
+  only, and the API's replay namespace is the account, which many repositories
+  can share. Without this segment two repositories deploying into one account
+  could collide, and the collision would hand one of them the other's
+  deployment.
+
+An anonymous deploy's key is ignored by the API (a key replays only within an
+account of its own), so a keyless re-run is a new deployment.
 
 Two axes have no ambient discriminator and take the override input: matrix
 legs deploying different content, and two invocations inside one job. Both are
@@ -360,8 +363,8 @@ before.
 | Job | What it holds |
 |---|---|
 | `lint` | actionlint over `.github/workflows/**`; the install line names ship major 3; the action is four shell steps |
-| `e2e-anonymous` | Deploys `fixture/` keyless to dev; asserts all four outputs, that `url` addresses `deployment`, that claim + expires are both present, that the URL serves 200 — and that a SECOND same-job invocation REPLAYS the first deployment rather than creating one (the derived key's documented same-job collapse, used as the fence for the silent class: an unread `SHIP_IDEMPOTENCY_KEY` would keep succeeding and simply duplicate) |
-| `e2e-authenticated` | Deploys with a token AND a domain; asserts the deployment is **not** claimable or expiring, reads `via` and both labels back from the API, and proves the collapsed path — `url` is the domain's, that URL serves 200, and the domain points at this run's deployment |
+| `e2e-anonymous` | Deploys `fixture/` keyless to dev; asserts all four outputs, that `url` addresses `deployment`, that claim + expires are both present, that the URL serves 200, and that a SECOND same-job invocation, carrying the same derived key, is a SECOND deployment (an anonymous key is ignored, so the public account never replays one stranger's site to another) |
+| `e2e-authenticated` | Deploys with a token AND a domain; asserts the deployment is **not** claimable or expiring, reads `via` and both labels back from the API, and proves the collapsed path: `url` is the domain's, that URL serves 200, and the domain points at this run's deployment. Then a SECOND same-job invocation REPLAYS the first deployment rather than creating one (the derived key's documented same-job collapse, used as the fence for the silent class: an unread `SHIP_IDEMPOTENCY_KEY` would keep succeeding and simply duplicate) |
 
 Five things about it are deliberate:
 
