@@ -28,7 +28,7 @@ inputs:
     description: 'Comma-separated labels for the deployment. The commit short SHA is always applied; these are added to it.'
     required: false
   idempotency-key:
-    description: 'Override the derived idempotency key. Defaults to this workflow run + job, so re-running a job replays the original deployment instead of deploying twice. Set one per matrix leg when legs deploy different content.'
+    description: 'Override the derived idempotency key. Defaults to this workflow run + job, so re-running a job replays the original deployment instead of deploying twice. Replays need a token: without one, each run is a new deployment. Set one per matrix leg when legs deploy different content.'
     required: false
   github-token:
     description: 'GitHub token for the PR comment. Defaults to the workflow''s own token; pass an empty string to post no comment.'
