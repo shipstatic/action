@@ -128,9 +128,9 @@ stays on v2. It kept working across ship 3.0 to 3.4 because the four shell steps
 read fields (`deployment`, `url`, `claim`, `expires`) that both majors answer
 alike, which is why v3 was cut as a catch-up rather than a repair. v3.0.0 moves
 the install line to `@shipstatic/ship@3` and changes nothing else in the steps;
-what a consumer gains by moving is the 3.x CLI itself (the empty-shell SPA rule
-with its loud `/spa-check` failure, the cancel signal, limits read per deploy,
-the API's way forward in a refusal). `v2` receives no changes, like `v1`.
+what a consumer gains by moving is the 3.x CLI itself (the empty-shell SPA rule,
+answered by the platform, the cancel signal, limits read per deploy, the API's
+way forward in a refusal). `v2` receives no changes, like `v1`.
 
 ## The v3 surface
 
