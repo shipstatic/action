@@ -380,9 +380,8 @@ Five things about it are deliberate:
 - **The authed leg asserts WHOSE account it deployed into**, against
   `CI_ACCOUNT_EMAIL` in the environment. Every other check describes what the
   deployment looks like, and an owned, labelled, git-attributed row looks the
-  same in any account — so when this leg's credential was swapped for a human's
-  on 2026-08-12 it stayed green for hours while filling a personal account, and
-  only a hand audit of deployment labels found it. **Neither the expected nor
+  same in any account, so a credential swapped for a person's would stay green
+  while filling their account. **Neither the expected nor
   the observed value is ever echoed**, and that is why the expected one is a
   SECRET rather than a variable. It cannot be a tracked literal — a `.dev`
   address fails the public-value fence — and a `vars.` value does not survive
@@ -396,7 +395,7 @@ Five things about it are deliberate:
   credential the CLI does not read still produces a clean 201. Only *no claim,
   no expiry* proves the token was read.
 - **The authed leg's rows accumulate, and that is accepted rather than
-  overlooked** (operator decision 2026-08-12). It adds one owned row per push,
+  overlooked**. It adds one owned row per push,
   owned deployments never expire, and the plan cap counts every row whatever
   its status, so the CI account fills on a schedule. A start-of-job prune on
   the `ci-fence` label lived here and was removed together with the three
@@ -410,7 +409,7 @@ Five things about it are deliberate:
   deploys with.
 - **The jobs refuse an unconfigured environment.** With no `SHIP_API_URL` the
   CLI would fall back to production, and `development` CI would deploy junk
-  into the live public account on every push.
+  into production on every push.
 - **actionlint does not read `action.yml`** — only workflows. It fences this
   file, not the product. A bespoke extractor to shellcheck the composite's
   `run:` blocks was considered and declined: one that silently found zero
@@ -425,29 +424,14 @@ working as designed, and the guard step cannot tell that apart from a
 misconfigured repo. A red e2e on a community PR would be a lie; a skipped job
 says what happened, and a maintainer re-runs the change from a branch.
 
-**USER setup, once:** a `development` GitHub Environment on
-`shipstatic/action` carrying a `SHIP_API_URL` variable (the dev API), a
-`CI_ACCOUNT_EMAIL` **secret** (the account `SHIP_TOKEN` belongs to — a secret
-rather than a variable for the masking reason above) and, optionally, the
-`SHIP_TOKEN` secret itself. Without `SHIP_TOKEN` the authed leg skips with a
-`::notice`; without `SHIP_API_URL` or `CI_ACCOUNT_EMAIL` the jobs fail loudly
-by design. **Re-minting the CI key means re-setting the secret in the same
-motion** — `PUT /account/key` is an upsert, so a fresh key in the dashboard
-revokes the one CI is holding.
-**Add no protection rules** — required reviewers or a wait timer would block
-every push and every PR, since this environment gates CI rather than a
-release.
-
-Two things about that secret are forced rather than chosen. It is a **`ship-`
-API key, not a `deploy-` token**: deploy tokens carry
-`permissions: { deploy: ['create'] }` and authenticate only on `deployScope`
-routes, which the leg's `ship deployments get` read-back is not. And it
-belongs to a **dedicated dev CI account**, never the operator's — a public
-repo's CI must not hold a human's admin credential, and `PUT /account/key` is
-an upsert that sweeps the account's existing key, so minting one for CI on a
-shared account would revoke the operator's. That account's deployment cap
-carries an override for the fence's burst, the same mechanism the dev PUBLIC
-account uses for the anonymous leg.
+**The jobs read a `development` GitHub Environment:** a `SHIP_API_URL`
+variable, a `CI_ACCOUNT_EMAIL` **secret** (a secret rather than a variable for
+the masking reason above) and, optionally, a `SHIP_TOKEN` secret. Without
+`SHIP_TOKEN` the authed leg skips with a `::notice`; without `SHIP_API_URL` or
+`CI_ACCOUNT_EMAIL` the jobs fail loudly by design. The token is an **API key,
+not a deploy token**, because the leg's `ship deployments get` read-back is
+not a deploy, and it belongs to a dedicated CI account, never a person's: a
+public repo's CI must not hold a human's admin credential.
 
 ## Tooling standard
 
@@ -525,19 +509,16 @@ Production is the only public value; the dev API URL arrives from the
 
 ## Consumers
 
-`integrations/action-example` — five workflows, all on `@v3` since
-2026-10-06 (on `@v2` from 2026-08-11) and all green against production, including
-`deploy-no-account.yml`, whose keyless path only works against a 2.x API. Its
-domain is owned by a dedicated `ci@shipstatic.com` account: it previously
-belonged to `public@shipstatic.com`, and since the public identity can hold no
-API key, **no credential could have linked it** — a domain is linkable only by
-the account that owns it.
+`shipstatic/action-example`: five workflows, all on `@v3` and green against
+production, including `deploy-no-account.yml`. Its domain is owned by a
+dedicated CI account, since a domain is linkable only by the account that
+owns it.
 
 `web/my`, `web/www` and `web/docs` all ship themselves through `@v3` since
 2026-10-06 (through `@v2` from 2026-08-11) — a push to `development` deploys the dev site, and **the merge to
 `main` IS the production deploy**, which is why every such merge is
-operator-timed. Their domains belong to the dedicated `sites@shipstatic.{dev,com}`
-accounts, since a domain is linkable only by its owner.
+operator-timed. Their domains belong to dedicated accounts, since a domain is
+linkable only by its owner.
 
 ## Post-launch: OIDC trusted deploying
 
