@@ -12,8 +12,8 @@
 # which is why they declare `environment: development` rather than reading a
 # repo variable: the deployment records GitHub writes are then true, the dev
 # credential is scoped to the jobs that deploy instead of to every workflow,
-# and the environment is the home the root CLAUDE.md "Branch & CI Model" names
-# for per-environment values. This repo is that mechanism's first consumer.
+# and the environment is the home the platform's release rules name for
+# per-environment values. This repo is that mechanism's first consumer.
 name: CI
 
 on:
@@ -376,7 +376,8 @@ jobs:
   # A red run on a push or a schedule reaches the operator's alerts channel; a
   # pull request's red already has a reader, its author. The webhook lives in
   # this job alone, which runs nothing but curl, and an unset secret fails the
-  # job rather than skipping it. Root CLAUDE.md, "CI notifications".
+  # job rather than skipping it.
+  # The platform's release rules hold this for every repo.
   notify:
     needs: [lint, e2e-anonymous, e2e-authenticated]
     if: failure() && github.event_name != 'pull_request'
