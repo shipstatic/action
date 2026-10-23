@@ -520,21 +520,6 @@ owns it.
 operator-timed. Their domains belong to dedicated accounts, since a domain is
 linkable only by its owner.
 
-## Post-launch: OIDC trusted deploying
-
-**The 2026 endgame for this action class is the runner's own OIDC token
-exchanged for a short-lived platform credential — no `SHIP_TOKEN` secret in any
-consumer at all.** It is the exact religion the estate already practices from
-the other side: the npm publish law abandoned long-lived tokens for trusted
-publishing, and this is that law read from the consuming end.
-
-It needs platform work before it can be an action change — an exchange endpoint
-that verifies GitHub's OIDC JWT, and a repository↔account binding a user
-creates once in the dashboard — so it is a **product decision, not an action
-wave**. Recorded here because of what it dissolves: the long-lived secret class
-entirely, and with it the key-rotation hygiene that follows every credential
-that has ever appeared in a log, a transcript or a screen share.
-
 ## Pointers
 
 | What | Where |
