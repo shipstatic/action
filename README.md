@@ -44,7 +44,7 @@ On pull requests the action also posts the address as a comment, updated in plac
 
 ## Keep your sites with a free account
 
-Everything above works with no account. A free account keeps your sites for good, lets you use your own domain, and shows you everything you've published in one place. To connect one here:
+Everything above works with no account. A free account keeps your sites for good, gives you a ShipStatic domain like `yourname.shipstatic.com`, and shows you everything you've published in one place. A custom domain like `www.example.com` needs a paid plan. To connect an account here:
 
 1. Get your free API key at [my.shipstatic.com/api-key](https://my.shipstatic.com/api-key).
 2. In your repository: **Settings → Secrets and variables → Actions → New repository secret**. Name it `SHIP_TOKEN`, paste the key.
@@ -91,6 +91,9 @@ One more line puts the site at your address:
 live at that address and the `url` output is your domain's URL. It needs a
 token (a domain belongs to an account), and without one the deploy is refused
 before anything is uploaded, rather than silently landing somewhere else.
+
+A custom domain like `www.example.com` needs a paid plan. On the free plan, use
+a ShipStatic domain like `yourname.shipstatic.com` the same way.
 
 ## Preview every pull request, with links that clean themselves up
 
